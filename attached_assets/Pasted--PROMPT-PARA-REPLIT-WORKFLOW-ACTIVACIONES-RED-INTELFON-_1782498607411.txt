@@ -1,0 +1,395 @@
+# PROMPT PARA REPLIT - WORKFLOW ACTIVACIONES RED INTELFON
+
+## CONTEXTO
+Necesito crear un sistema completo de workflow/tracking para el proceso de activaciones de clientes en Red Intelfon. El sistema debe manejar 5 etapas secuenciales, cada una con checklist, SLA, notificaciones y un chat inter-etapas.
+
+## DESCRIPCIÓN DEL PROYECTO
+
+### Objetivo General
+Crear una plataforma web que automatice y rastree el proceso de activación de clientes desde que el ejecutivo de ventas entrega la documentación (Pre-oferta) hasta que el cliente recibe y se capacita en el uso del equipo. El sistema debe:
+- Trackear el progreso por etapa con cronómetro de SLA
+- Permitir chats entre áreas de etapas contiguas
+- Generar notificaciones automáticas
+- Proporcionar un dashboard visual con diagrama de progreso
+- Permitir al admin configurar etapas, checklist y SLA
+
+### Las 5 Etapas (Fases)
+1. **Fase I: Documentación y Digitalización** (24h)
+   - Responsable: Ejecutivo de Ventas → Activaciones
+   - Tareas: Checklist documental, digitalización, análisis crediticio, pre-oferta
+   - ID Proceso: Número de Pre-oferta (ingresado por Ventas)
+
+2. **Fase II: STR y Despacho** (24h)
+   - Responsable: Activaciones → Bodega
+   - Tareas: Generar STR, verificar inventario, despacho de equipos
+   - Entrega: STR automático
+
+3. **Fase III: Configuración de Dispositivos** (24h)
+   - Responsable: Activaciones ↔ MSO
+   - Tareas: Asignar SIM/IMEI, generar anexos, crear cuentas en MSO
+   - Entrega: B800 automático
+
+4. **Fase IV: Armado y Configuración Física** (24h)
+   - Responsable: Bodega → Activaciones (5 días hábiles máximo)
+   - Tareas: Armado, configuración Android, pruebas funcionales
+   - Entrega: Ningún código especial
+
+5. **Fase V: Entrega y Capacitación** (24h)
+   - Responsable: Activaciones → Logística → Cliente
+   - Tareas: Checklist final, confirmación entrega, capacitación, R800
+   - Entrega: R800 automático
+
+## ESPECIFICACIONES TÉCNICAS
+
+### Stack Recomendado
+- **Frontend:** React.js + Redux + Tailwind CSS + Socket.io
+- **Backend:** Node.js + Express + PostgreSQL
+- **Real-time:** Socket.io para chat y notificaciones
+- **Base de Datos:** PostgreSQL con las tablas especificadas abajo
+- **Autenticación:** JWT
+- **Almacenamiento:** Sistema de archivos local o AWS S3
+
+### Base de Datos - Tablas Principales
+
+```
+USUARIOS
+- id_usuario (PK)
+- nombre
+- email
+- password_hash
+- rol (ENUM: 'Ventas', 'Activaciones', 'Bodega', 'MSO', 'Logistica', 'Admin')
+- activo (boolean)
+- fecha_creacion
+- area (texto: departamento)
+
+PROCESOS
+- id_proceso (PK)
+- numero_preoferta (UNIQUE, ingresado por Ventas)
+- estado_actual (ENUM: 'en_espera', 'en_fase_1', 'en_fase_2', 'en_fase_3', 'en_fase_4', 'en_fase_5', 'completado')
+- cliente_nombre
+- cliente_email
+- cliente_telefono
+- fecha_inicio (timestamp)
+- fecha_fin_estimada (calculada: fecha_inicio + sla_global)
+- fecha_fin_real
+- sla_global_horas (default: 120)
+- prioridad (ENUM: 'baja', 'media', 'alta', 'urgente') - default: baja
+- fijado (boolean - para procesos ancla)
+- justificacion_retraso (texto nullable)
+- archivo_justificacion_url (nullable)
+- usuario_creador (FK USUARIOS)
+
+ETAPAS_PROCESO
+- id_etapa_proceso (PK)
+- id_proceso (FK PROCESOS)
+- numero_etapa (1-5)
+- estado (ENUM: 'pendiente', 'activa', 'completada')
+- fecha_inicio (timestamp nullable)
+- fecha_fin (timestamp nullable)
+- sla_etapa_horas (default: 24)
+- usuario_responsable (FK USUARIOS nullable - se asigna cuando etapa se activa)
+- completado_por (FK USUARIOS nullable)
+- checklist_completado (boolean)
+
+CHECKLIST_ITEMS
+- id_item (PK)
+- id_etapa_proceso (FK ETAPAS_PROCESO)
+- descripcion
+- completado (boolean)
+- usuario_quien_completo (FK USUARIOS nullable)
+- fecha_completado (timestamp nullable)
+- archivo_evidencia_url (nullable)
+- notas (texto nullable)
+
+CHATS_INTER_ETAPAS
+- id_mensaje (PK)
+- id_proceso (FK PROCESOS)
+- etapa_origen (1-5)
+- etapa_destino (1-5)
+- usuario_remitente (FK USUARIOS)
+- contenido (texto)
+- archivo_url (nullable)
+- foto_url (nullable)
+- fecha_mensaje (timestamp)
+- leido (boolean)
+
+NOTIFICACIONES
+- id_notificacion (PK)
+- usuario_destino (FK USUARIOS)
+- id_proceso (FK PROCESOS nullable)
+- tipo (ENUM: 'etapa_lista', 'sla_proximo', 'sla_vencido', 'chat_nuevo', 'comentario_nuevo', 'documento_faltante')
+- titulo
+- mensaje
+- leido (boolean)
+- fecha_creacion (timestamp)
+
+CONFIGURACION_ETAPAS
+- id_config (PK)
+- numero_etapa (1-5, UNIQUE)
+- nombre_etapa
+- descripcion
+- sla_horas (default: 24)
+- areas_involucradas (JSON array: ['Ventas', 'Activaciones', 'Bodega'])
+- checklist_template (JSON array de objetos con campo 'descripcion')
+- activa (boolean)
+- orden_visualizacion
+
+CONFIGURACION_SLA
+- id_sla_config (PK)
+- nombre
+- sla_global_horas (total de horas para completar todo)
+- alerta_porcentaje (mostrar alerta al 80% del tiempo)
+- activo (boolean)
+```
+
+## FUNCIONALIDADES PRINCIPALES
+
+### 1. Módulo de Administrador
+**Ruta:** `/admin` (solo rol Admin)
+- **Gestión de Etapas:** CRUD de las 5 etapas (nombre, descripción, SLA, áreas)
+- **Diseñador de Checklist:** Para cada etapa, agregar/editar ítems del checklist
+- **Configurar SLA:** Tiempo máximo por etapa y SLA global
+- **Crear Usuarios:** Form para crear usuarios con rol y área asignada
+- **Dashboard de SLA:** Gráficas (Chart.js) con:
+  - Cumplimiento de SLA por etapa (barras)
+  - Procesos en riesgo (amarillo si > 80%, rojo si excedido)
+  - Tiempo promedio por etapa (línea)
+  - Procesos completados vs en progreso
+  - Retrasos justificados vs injustificados
+- **Priorizar Procesos:** Listar todos los procesos, permitir "fijar" como prioritario
+- **Ver Auditoría:** Historial de cambios, justificaciones, logs
+
+### 2. Módulo de Ventas (Crear Proceso)
+**Ruta:** `/procesos/crear`
+- Form con campos:
+  - Número de Pre-oferta (UNIQUE) *input*
+  - Nombre cliente *input*
+  - Email cliente *input*
+  - Teléfono cliente *input*
+  - Tipo de cliente (Nuevo/Existente) *select*
+  - Plan solicitado *select*
+  - Cantidad de equipos *number*
+- Upload de documentos:
+  - ID/Cédula (foto)
+  - Contrato (PDF)
+  - Comprobante de domicilio (foto)
+  - Referencias personales (doc)
+- Checkbox para marcar documentos como adjuntos
+- Botón "Crear Proceso" (se genera ID de Pre-oferta automáticamente)
+- Al crear, se abre automaticamente **Fase I** y queda esperando checklist de Activaciones
+
+### 3. Dashboard Principal
+**Ruta:** `/dashboard`
+- **Vista de Búsqueda y Filtrado:**
+  - Buscador: por número de Pre-oferta
+  - Filtros: por estado, área, cliente, prioridad
+  - Tabla: No. Pre-oferta | Cliente | Estado Actual | SLA Restante | Acción
+
+- **Vista de Tracking Visual (para seleccionar Pre-oferta):**
+  - Seleccionar Pre-oferta → mostrar:
+    - Diagrama visual (radio/punto avanzando por etapas)
+    - Timeline con fechas de inicio/fin por etapa
+    - Barra de SLA global + SLA por etapa
+    - Estado de checklist (ítems completados/totales)
+    - Botón "Ver Detalles" → abre vista completa
+
+### 4. Vista de Etapa (Punto de Trabajo)
+**Ruta:** `/etapa/:idProceso/:numeroEtapa`
+
+**Componentes:**
+1. **Header de Proceso:**
+   - Pre-oferta: PO-2024-001234
+   - Cliente: Empresa XYZ
+   - Estado: Fase II - STR y Despacho
+   - SLA Etapa: 18:45 restantes (cronómetro activo)
+   - SLA Global: 95:30 restantes
+
+2. **Panel de Checklist:**
+   - Listar todos los ítems de la etapa (template personalizado)
+   - Checkbox para completar cada ítem
+   - Campo de notas por ítem (opcional)
+   - Opción de upload de evidencia (foto/documento) por ítem
+   - **Mostrar alerta roja si falta completar algún ítem para avanzar**
+   - Botón "Marcar Etapa como Completada" (habilitado solo si checklist = 100%)
+
+3. **Chat Inter-Etapas:**
+   - Mostrar chat SOLO con etapa anterior y etapa siguiente
+   - Usuarios que ven el chat: los de las áreas de ambas etapas
+   - Entrada de texto + botón enviar
+   - Permitir upload de foto/archivo
+   - Mostrar timestamp y nombre de usuario
+   - Notificación en tiempo real cuando nuevo mensaje (Socket.io)
+
+4. **Información de Etapa:**
+   - Tareas principales (descripción)
+   - Áreas involucradas (badges)
+   - Usuario responsable actual
+   - Histórico: fechas de inicio/fin de fases anteriores
+
+5. **Sección de Justificación (si SLA vencido):**
+   - Campo de texto: "¿Por qué se excedió el SLA?"
+   - Upload de evidencia (captura, mail, documento)
+   - Botón "Justificar y Continuar"
+
+### 5. Sistema de Notificaciones
+**En tiempo real (Socket.io):**
+- Cuando Fase X se marca como completada → notificación a usuarios de Fase X+1: "Tu turno en Fase X+1 para Pre-oferta #123"
+- Si SLA está próximo a vencerse (80%) → notificación a usuario responsable
+- Si SLA ya venció → notificación en rojo + recordatorio cada 30 min
+- Nuevo mensaje en chat → notificación a destinatarios
+- Si documento faltante en checklist → opción de "marcar como requerido" y notificar etapa anterior
+
+**Histórico:**
+- Modal/página de notificaciones (solo últimas 50)
+- Marcar como leído
+- Click abre la etapa/proceso relacionado
+
+### 6. Generación Automática de Códigos
+Cuando se avanza de etapa:
+- **STR** (Fase II): `STR-YYYY-MM-NNNNN` (generado automáticamente)
+- **B800** (Fase III): `B800-YYYY-MM-NNNNN` (generado automáticamente)
+- **R800** (Fase V): `R800-YYYY-MM-NNNNN` (generado automáticamente)
+
+Estos códigos se almacenan en tabla PROCESOS en columnas adicionales.
+
+## RUTAS API (Node + Express)
+
+### Autenticación
+```
+POST   /api/auth/login
+POST   /api/auth/register
+POST   /api/auth/logout
+GET    /api/auth/me
+```
+
+### Procesos
+```
+POST   /api/procesos              (crear nuevo proceso - Ventas)
+GET    /api/procesos              (listar todos - con filtros)
+GET    /api/procesos/:id          (obtener detalles)
+PUT    /api/procesos/:id          (actualizar proceso)
+POST   /api/procesos/:id/priorizar (fijarlo - Admin)
+```
+
+### Etapas
+```
+GET    /api/procesos/:id/etapas   (listar etapas de un proceso)
+GET    /api/procesos/:id/etapas/:numeroEtapa (obtener etapa específica)
+PUT    /api/procesos/:id/etapas/:numeroEtapa (actualizar etapa)
+POST   /api/procesos/:id/etapas/:numeroEtapa/completar (marcar como completada)
+POST   /api/procesos/:id/etapas/:numeroEtapa/justificar (justificar retraso)
+```
+
+### Checklist
+```
+GET    /api/etapas/:id/checklist  (obtener checklist de una etapa)
+PUT    /api/checklist/:itemId/toggle (marcar/desmarcar)
+POST   /api/checklist/:itemId/evidencia (upload de evidencia)
+```
+
+### Chat
+```
+GET    /api/procesos/:id/chat/:etapaOrigen/:etapaDestino (obtener mensajes)
+POST   /api/procesos/:id/chat/:etapaOrigen/:etapaDestino/mensaje (enviar mensaje)
+POST   /api/chat/mensaje/:id/marcar-leido
+```
+
+### Notificaciones
+```
+GET    /api/notificaciones        (obtener notificaciones del usuario)
+PUT    /api/notificaciones/:id/leer
+DELETE /api/notificaciones/:id
+```
+
+### Administrador
+```
+GET    /api/admin/etapas          (obtener configuración de etapas)
+PUT    /api/admin/etapas/:id      (actualizar etapa config)
+POST   /api/admin/etapas/:id/checklist-template (actualizar template)
+
+GET    /api/admin/usuarios        (listar usuarios)
+POST   /api/admin/usuarios        (crear usuario)
+PUT    /api/admin/usuarios/:id    (editar usuario)
+DELETE /api/admin/usuarios/:id    (eliminar usuario)
+
+GET    /api/admin/sla-config      (obtener configuración SLA)
+PUT    /api/admin/sla-config      (actualizar SLA config)
+
+GET    /api/admin/reportes/sla    (datos para gráficas)
+GET    /api/admin/reportes/procesos (listado con métricas)
+```
+
+## WIREFRAMES/PÁGINAS CLAVE
+
+### Páginas que DEBEN implementarse:
+1. **Login** `/login` - Form simple email/password
+2. **Dashboard Principal** `/dashboard` - Búsqueda + tabla procesos + selector
+3. **Crear Proceso** `/procesos/crear` - Form con uploads
+4. **Vista Etapa** `/etapa/:idProceso/:numeroEtapa` - Punto de trabajo
+5. **Tracking Visual** `/tracking/:idProceso` - Diagrama + timeline
+6. **Admin: Etapas** `/admin/etapas` - CRUD etapas
+7. **Admin: Usuarios** `/admin/usuarios` - CRUD usuarios
+8. **Admin: SLA Config** `/admin/sla` - Configurar tiempos
+9. **Admin: Reportes** `/admin/reportes` - Gráficas de SLA
+
+## RESTRICCIONES Y REGLAS
+
+1. **No se puede pausar una etapa.** Solo se puede justificar si excede SLA.
+2. **No se avanza de etapa sin completar 100% del checklist** (excepto con justificación explícita).
+3. **Chat es privado entre etapas contiguas.** Etapa 1 y 3 NO se ven directamente.
+4. **Notificaciones obligatorias:** Si SLA va a vencerse, notificar cada 30 min.
+5. **Cronómetro visible:** Siempre mostrar tiempo restante de SLA en rojo/amarillo.
+6. **Prioridad:** Los procesos urgentes aparecen al inicio en rojo.
+7. **Edición limitada:** Solo Admin puede editar etapas y SLA. Solo propietario de proceso puede crear.
+8. **Auditoría completa:** Registrar quién hizo qué, cuándo y por qué.
+
+## CONSIDERACIONES DE DISEÑO
+
+- **Color scheme:** Azul/Púrpura para elementos principales, Rojo para alertas SLA
+- **Responsive:** Debe funcionar en móvil (usuarios en terreno)
+- **Accesibilidad:** WCAG 2.1 AA minimum
+- **Performance:** Cargar procesos < 2s, notificaciones real-time < 500ms
+- **Timeouts:** Sincronizar con servidor cada 60s para validar SLA
+
+## ENTREGABLES INICIALES
+
+1. **Estructura del Proyecto:**
+   - Carpeta `/frontend` (React)
+   - Carpeta `/backend` (Node + Express)
+   - Carpeta `/database` (scripts SQL)
+   - `.env.example` con variables de entorno
+
+2. **Backend Setup:**
+   - Express server en puerto 5000
+   - Conexión PostgreSQL
+   - Rutas básicas (auth, procesos)
+   - Middleware de autenticación JWT
+
+3. **Frontend Setup:**
+   - Estructura de componentes React
+   - Redux store básico
+   - Páginas principales (Login, Dashboard, Etapa)
+   - Socket.io conectado
+
+4. **Base de Datos:**
+   - Script SQL para crear todas las tablas
+   - Datos seed (usuarios demo, configuración default)
+
+5. **Documentación:**
+   - README.md con instrucciones de instalación
+   - Guía de API (Swagger o manual)
+   - Guía de uso para diferentes roles
+
+## PRÓXIMAS FASES (POST-MVP)
+
+- Integración con sistemas SAP/SAN
+- Envío de emails automáticos
+- Exportación de reportes (PDF/Excel)
+- Mobile app (React Native)
+- Sincronización con MSO
+- Estadísticas avanzadas
+- Integraciones Twilio para SMS
+
+---
+
+**¡Listo para codificar! Este prompt contiene todo lo necesario para generar un MVP completamente funcional del sistema de workflow para Red Intelfon.**

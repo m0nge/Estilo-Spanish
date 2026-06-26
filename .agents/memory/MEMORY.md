@@ -1,0 +1,1 @@
+- [Red Intelfon API conventions](intelfon-api-conventions.md) — SLA times in minutes, estadoActual as snake_case enum, chat endpoint requires etapaOrigen+etapaDestino params

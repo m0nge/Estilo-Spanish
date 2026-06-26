@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Red Intelfon - Workflow Activaciones"
+version = "1.0.0"
+id = "artifacts/intelfon"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21329
+
+[services.development]
+run = "pnpm --filter @workspace/intelfon run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/intelfon", "run", "build" ]
+publicDir = "artifacts/intelfon/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21329"
+BASE_PATH = "/"

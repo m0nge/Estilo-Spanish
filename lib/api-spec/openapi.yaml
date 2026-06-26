@@ -1,22 +1,35 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Red Intelfon - Workflow de Activaciones API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Autenticación
+  - name: procesos
+    description: Procesos de activación
+  - name: etapas
+    description: Etapas del proceso
+  - name: checklist
+    description: Items de checklist
+  - name: chat
+    description: Chat inter-etapas
+  - name: notificaciones
+    description: Notificaciones
+  - name: admin
+    description: Administración
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +37,615 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Auth
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Iniciar sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Credenciales inválidas
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Obtener usuario autenticado
+      responses:
+        "200":
+          description: Usuario actual
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+        "401":
+          description: No autorizado
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Cerrar sesión
+      responses:
+        "200":
+          description: Sesión cerrada
+
+  # Procesos
+  /procesos:
+    get:
+      operationId: listProcesos
+      tags: [procesos]
+      summary: Listar procesos con filtros
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            type: string
+        - name: prioridad
+          in: query
+          schema:
+            type: string
+        - name: busqueda
+          in: query
+          schema:
+            type: string
+        - name: area
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de procesos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Proceso"
+    post:
+      operationId: createProceso
+      tags: [procesos]
+      summary: Crear nuevo proceso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcesoInput"
+      responses:
+        "201":
+          description: Proceso creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proceso"
+
+  /procesos/dashboard:
+    get:
+      operationId: getDashboardStats
+      tags: [procesos]
+      summary: Estadísticas del dashboard
+      responses:
+        "200":
+          description: Estadísticas generales
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /procesos/{id}:
+    get:
+      operationId: getProceso
+      tags: [procesos]
+      summary: Obtener proceso por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Proceso encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcesoDetalle"
+        "404":
+          description: No encontrado
+    put:
+      operationId: updateProceso
+      tags: [procesos]
+      summary: Actualizar proceso
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcesoUpdate"
+      responses:
+        "200":
+          description: Proceso actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proceso"
+
+  /procesos/{id}/priorizar:
+    post:
+      operationId: priorizarProceso
+      tags: [procesos]
+      summary: Fijar proceso como prioritario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PriorizarInput"
+      responses:
+        "200":
+          description: Proceso priorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Proceso"
+
+  # Etapas
+  /procesos/{id}/etapas:
+    get:
+      operationId: listEtapasProceso
+      tags: [etapas]
+      summary: Listar etapas de un proceso
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de etapas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EtapaProceso"
+
+  /procesos/{id}/etapas/{numeroEtapa}:
+    get:
+      operationId: getEtapa
+      tags: [etapas]
+      summary: Obtener una etapa específica
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: numeroEtapa
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Etapa encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtapaDetalle"
+
+  /procesos/{id}/etapas/{numeroEtapa}/completar:
+    post:
+      operationId: completarEtapa
+      tags: [etapas]
+      summary: Marcar etapa como completada
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: numeroEtapa
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Etapa completada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtapaProceso"
+        "400":
+          description: Checklist incompleto
+
+  /procesos/{id}/etapas/{numeroEtapa}/justificar:
+    post:
+      operationId: justificarEtapa
+      tags: [etapas]
+      summary: Justificar retraso de SLA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: numeroEtapa
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JustificacionInput"
+      responses:
+        "200":
+          description: Justificación registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EtapaProceso"
+
+  # Checklist
+  /etapas/{etapaId}/checklist:
+    get:
+      operationId: getChecklist
+      tags: [checklist]
+      summary: Obtener checklist de una etapa
+      parameters:
+        - name: etapaId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChecklistItem"
+
+  /checklist/{itemId}/toggle:
+    put:
+      operationId: toggleChecklistItem
+      tags: [checklist]
+      summary: Marcar/desmarcar item de checklist
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistToggleInput"
+      responses:
+        "200":
+          description: Item actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+
+  # Chat
+  /procesos/{id}/chat/{etapaOrigen}/{etapaDestino}:
+    get:
+      operationId: getChatMensajes
+      tags: [chat]
+      summary: Obtener mensajes del chat entre etapas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: etapaOrigen
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: etapaDestino
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Lista de mensajes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMensaje"
+    post:
+      operationId: sendChatMensaje
+      tags: [chat]
+      summary: Enviar mensaje en chat
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: etapaOrigen
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: etapaDestino
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMensajeInput"
+      responses:
+        "201":
+          description: Mensaje enviado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatMensaje"
+
+  # Notificaciones
+  /notificaciones:
+    get:
+      operationId: listNotificaciones
+      tags: [notificaciones]
+      summary: Obtener notificaciones del usuario
+      responses:
+        "200":
+          description: Lista de notificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notificacion"
+
+  /notificaciones/{id}/leer:
+    put:
+      operationId: marcarNotificacionLeida
+      tags: [notificaciones]
+      summary: Marcar notificación como leída
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notificación marcada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notificacion"
+
+  /notificaciones/leer-todas:
+    put:
+      operationId: marcarTodasLeidas
+      tags: [notificaciones]
+      summary: Marcar todas las notificaciones como leídas
+      responses:
+        "200":
+          description: Todas marcadas
+
+  # Admin - Usuarios
+  /admin/usuarios:
+    get:
+      operationId: listUsuarios
+      tags: [admin]
+      summary: Listar usuarios
+      responses:
+        "200":
+          description: Lista de usuarios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Usuario"
+    post:
+      operationId: createUsuario
+      tags: [admin]
+      summary: Crear usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsuarioInput"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+
+  /admin/usuarios/{id}:
+    put:
+      operationId: updateUsuario
+      tags: [admin]
+      summary: Editar usuario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsuarioUpdate"
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Usuario"
+    delete:
+      operationId: deleteUsuario
+      tags: [admin]
+      summary: Eliminar usuario
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Usuario eliminado
+
+  # Admin - Etapas Config
+  /admin/etapas:
+    get:
+      operationId: listConfigEtapas
+      tags: [admin]
+      summary: Obtener configuración de etapas
+      responses:
+        "200":
+          description: Lista de configuraciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConfigEtapa"
+
+  /admin/etapas/{id}:
+    put:
+      operationId: updateConfigEtapa
+      tags: [admin]
+      summary: Actualizar configuración de etapa
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigEtapaUpdate"
+      responses:
+        "200":
+          description: Configuración actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigEtapa"
+
+  # Admin - SLA
+  /admin/sla-config:
+    get:
+      operationId: getSlaConfig
+      tags: [admin]
+      summary: Obtener configuración de SLA
+      responses:
+        "200":
+          description: Configuración de SLA
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaConfig"
+    put:
+      operationId: updateSlaConfig
+      tags: [admin]
+      summary: Actualizar configuración de SLA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SlaConfigUpdate"
+      responses:
+        "200":
+          description: Configuración actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SlaConfig"
+
+  # Admin - Reportes
+  /admin/reportes/sla:
+    get:
+      operationId: getReporteSla
+      tags: [admin]
+      summary: Datos para gráficas de SLA
+      responses:
+        "200":
+          description: Datos de reportes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReporteSla"
+
+  /admin/reportes/procesos:
+    get:
+      operationId: getReporteProcesos
+      tags: [admin]
+      summary: Listado de procesos con métricas
+      responses:
+        "200":
+          description: Procesos con métricas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProcesoMetrica"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +656,561 @@ components:
       required:
         - status
 
+    # Auth
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      required: [token, usuario]
+      properties:
+        token:
+          type: string
+        usuario:
+          $ref: "#/components/schemas/Usuario"
+
+    # Usuario
+    Usuario:
+      type: object
+      required: [id, nombre, email, rol, activo]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        email:
+          type: string
+        rol:
+          type: string
+          enum: [Ventas, Activaciones, Bodega, MSO, Logistica, Admin]
+        area:
+          type: ["string", "null"]
+        activo:
+          type: boolean
+        fechaCreacion:
+          type: string
+          format: date-time
+
+    UsuarioInput:
+      type: object
+      required: [nombre, email, password, rol]
+      properties:
+        nombre:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        rol:
+          type: string
+          enum: [Ventas, Activaciones, Bodega, MSO, Logistica, Admin]
+        area:
+          type: string
+
+    UsuarioUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        email:
+          type: string
+        rol:
+          type: string
+        area:
+          type: string
+        activo:
+          type: boolean
+
+    # Proceso
+    Proceso:
+      type: object
+      required: [id, numeroPreoferta, estadoActual, clienteNombre, prioridad, fijado, fechaInicio, slaGlobalHoras]
+      properties:
+        id:
+          type: integer
+        numeroPreoferta:
+          type: string
+        estadoActual:
+          type: string
+          enum: [en_espera, en_fase_1, en_fase_2, en_fase_3, en_fase_4, en_fase_5, completado]
+        clienteNombre:
+          type: string
+        clienteEmail:
+          type: ["string", "null"]
+        clienteTelefono:
+          type: ["string", "null"]
+        fechaInicio:
+          type: string
+          format: date-time
+        fechaFinEstimada:
+          type: ["string", "null"]
+          format: date-time
+        fechaFinReal:
+          type: ["string", "null"]
+          format: date-time
+        slaGlobalHoras:
+          type: integer
+        prioridad:
+          type: string
+          enum: [baja, media, alta, urgente]
+        fijado:
+          type: boolean
+        usuarioCreadorId:
+          type: ["integer", "null"]
+        etapaActual:
+          type: ["integer", "null"]
+        slaVencido:
+          type: boolean
+
+    ProcesoDetalle:
+      type: object
+      required: [id, numeroPreoferta, estadoActual, clienteNombre, prioridad, fijado, fechaInicio, slaGlobalHoras, etapas]
+      properties:
+        id:
+          type: integer
+        numeroPreoferta:
+          type: string
+        estadoActual:
+          type: string
+        clienteNombre:
+          type: string
+        clienteEmail:
+          type: ["string", "null"]
+        clienteTelefono:
+          type: ["string", "null"]
+        fechaInicio:
+          type: string
+          format: date-time
+        fechaFinEstimada:
+          type: ["string", "null"]
+          format: date-time
+        fechaFinReal:
+          type: ["string", "null"]
+          format: date-time
+        slaGlobalHoras:
+          type: integer
+        prioridad:
+          type: string
+        fijado:
+          type: boolean
+        etapaActual:
+          type: ["integer", "null"]
+        slaVencido:
+          type: boolean
+        etapas:
+          type: array
+          items:
+            $ref: "#/components/schemas/EtapaProceso"
+        codigoStr:
+          type: ["string", "null"]
+        codigoB800:
+          type: ["string", "null"]
+        codigoR800:
+          type: ["string", "null"]
+
+    ProcesoInput:
+      type: object
+      required: [clienteNombre, tipoCliente, planSolicitado]
+      properties:
+        clienteNombre:
+          type: string
+        clienteEmail:
+          type: string
+        clienteTelefono:
+          type: string
+        tipoCliente:
+          type: string
+          enum: [Nuevo, Existente]
+        planSolicitado:
+          type: string
+        cantidadEquipos:
+          type: integer
+        prioridad:
+          type: string
+          enum: [baja, media, alta, urgente]
+
+    ProcesoUpdate:
+      type: object
+      properties:
+        clienteNombre:
+          type: string
+        clienteEmail:
+          type: string
+        clienteTelefono:
+          type: string
+        prioridad:
+          type: string
+
+    PriorizarInput:
+      type: object
+      required: [fijado]
+      properties:
+        fijado:
+          type: boolean
+        prioridad:
+          type: string
+          enum: [baja, media, alta, urgente]
+
+    DashboardStats:
+      type: object
+      required: [totalProcesos, enProgreso, completados, vencidos, porFase]
+      properties:
+        totalProcesos:
+          type: integer
+        enProgreso:
+          type: integer
+        completados:
+          type: integer
+        vencidos:
+          type: integer
+        urgentes:
+          type: integer
+        porFase:
+          type: array
+          items:
+            $ref: "#/components/schemas/FaseCount"
+
+    FaseCount:
+      type: object
+      required: [fase, nombre, cantidad]
+      properties:
+        fase:
+          type: integer
+        nombre:
+          type: string
+        cantidad:
+          type: integer
+
+    # Etapas
+    EtapaProceso:
+      type: object
+      required: [id, idProceso, numeroEtapa, estado, slaEtapaHoras]
+      properties:
+        id:
+          type: integer
+        idProceso:
+          type: integer
+        numeroEtapa:
+          type: integer
+        estado:
+          type: string
+          enum: [pendiente, activa, completada]
+        fechaInicio:
+          type: ["string", "null"]
+          format: date-time
+        fechaFin:
+          type: ["string", "null"]
+          format: date-time
+        slaEtapaHoras:
+          type: integer
+        usuarioResponsableId:
+          type: ["integer", "null"]
+        checklistCompletado:
+          type: boolean
+        nombreEtapa:
+          type: string
+        slaVencido:
+          type: boolean
+        minutosRestantes:
+          type: ["integer", "null"]
+
+    EtapaDetalle:
+      type: object
+      required: [id, idProceso, numeroEtapa, estado, slaEtapaHoras, checklist]
+      properties:
+        id:
+          type: integer
+        idProceso:
+          type: integer
+        numeroEtapa:
+          type: integer
+        estado:
+          type: string
+        fechaInicio:
+          type: ["string", "null"]
+          format: date-time
+        fechaFin:
+          type: ["string", "null"]
+          format: date-time
+        slaEtapaHoras:
+          type: integer
+        usuarioResponsableId:
+          type: ["integer", "null"]
+        checklistCompletado:
+          type: boolean
+        nombreEtapa:
+          type: string
+        descripcionEtapa:
+          type: ["string", "null"]
+        areasInvolucradas:
+          type: array
+          items:
+            type: string
+        slaVencido:
+          type: boolean
+        minutosRestantes:
+          type: ["integer", "null"]
+        checklist:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+        proceso:
+          $ref: "#/components/schemas/Proceso"
+
+    JustificacionInput:
+      type: object
+      required: [justificacion]
+      properties:
+        justificacion:
+          type: string
+
+    # Checklist
+    ChecklistItem:
+      type: object
+      required: [id, idEtapaProceso, descripcion, completado]
+      properties:
+        id:
+          type: integer
+        idEtapaProceso:
+          type: integer
+        descripcion:
+          type: string
+        completado:
+          type: boolean
+        notas:
+          type: ["string", "null"]
+        fechaCompletado:
+          type: ["string", "null"]
+          format: date-time
+        usuarioQuienCompletoId:
+          type: ["integer", "null"]
+
+    ChecklistToggleInput:
+      type: object
+      required: [completado]
+      properties:
+        completado:
+          type: boolean
+        notas:
+          type: string
+
+    # Chat
+    ChatMensaje:
+      type: object
+      required: [id, idProceso, etapaOrigen, etapaDestino, usuarioRemitenteId, contenido, fechaMensaje, leido]
+      properties:
+        id:
+          type: integer
+        idProceso:
+          type: integer
+        etapaOrigen:
+          type: integer
+        etapaDestino:
+          type: integer
+        usuarioRemitenteId:
+          type: integer
+        contenido:
+          type: string
+        fechaMensaje:
+          type: string
+          format: date-time
+        leido:
+          type: boolean
+        nombreRemitente:
+          type: string
+        rolRemitente:
+          type: string
+
+    ChatMensajeInput:
+      type: object
+      required: [contenido]
+      properties:
+        contenido:
+          type: string
+
+    # Notificaciones
+    Notificacion:
+      type: object
+      required: [id, usuarioDestinoId, tipo, titulo, mensaje, leido, fechaCreacion]
+      properties:
+        id:
+          type: integer
+        usuarioDestinoId:
+          type: integer
+        idProceso:
+          type: ["integer", "null"]
+        tipo:
+          type: string
+          enum: [etapa_lista, sla_proximo, sla_vencido, chat_nuevo, comentario_nuevo, documento_faltante]
+        titulo:
+          type: string
+        mensaje:
+          type: string
+        leido:
+          type: boolean
+        fechaCreacion:
+          type: string
+          format: date-time
+
+    # Admin - Config Etapas
+    ConfigEtapa:
+      type: object
+      required: [id, numeroEtapa, nombreEtapa, slaHoras, activa]
+      properties:
+        id:
+          type: integer
+        numeroEtapa:
+          type: integer
+        nombreEtapa:
+          type: string
+        descripcion:
+          type: ["string", "null"]
+        slaHoras:
+          type: integer
+        areasInvolucradas:
+          type: array
+          items:
+            type: string
+        checklistTemplate:
+          type: array
+          items:
+            type: object
+            properties:
+              descripcion:
+                type: string
+        activa:
+          type: boolean
+        ordenVisualizacion:
+          type: integer
+
+    ConfigEtapaUpdate:
+      type: object
+      properties:
+        nombreEtapa:
+          type: string
+        descripcion:
+          type: string
+        slaHoras:
+          type: integer
+        areasInvolucradas:
+          type: array
+          items:
+            type: string
+        checklistTemplate:
+          type: array
+          items:
+            type: object
+            properties:
+              descripcion:
+                type: string
+        activa:
+          type: boolean
+
+    # SLA Config
+    SlaConfig:
+      type: object
+      required: [id, nombre, slaGlobalHoras, alertaPorcentaje, activo]
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        slaGlobalHoras:
+          type: integer
+        alertaPorcentaje:
+          type: integer
+        activo:
+          type: boolean
+
+    SlaConfigUpdate:
+      type: object
+      properties:
+        nombre:
+          type: string
+        slaGlobalHoras:
+          type: integer
+        alertaPorcentaje:
+          type: integer
+
+    # Reportes
+    ReporteSla:
+      type: object
+      required: [cumplimientoPorEtapa, promedioTiempoPorEtapa, procesosEnRiesgo, totalCompletados, totalEnProgreso]
+      properties:
+        cumplimientoPorEtapa:
+          type: array
+          items:
+            $ref: "#/components/schemas/CumplimientoEtapa"
+        promedioTiempoPorEtapa:
+          type: array
+          items:
+            $ref: "#/components/schemas/PromedioTiempo"
+        procesosEnRiesgo:
+          type: array
+          items:
+            $ref: "#/components/schemas/Proceso"
+        totalCompletados:
+          type: integer
+        totalEnProgreso:
+          type: integer
+        totalVencidos:
+          type: integer
+
+    CumplimientoEtapa:
+      type: object
+      required: [etapa, nombre, cumplidos, vencidos]
+      properties:
+        etapa:
+          type: integer
+        nombre:
+          type: string
+        cumplidos:
+          type: integer
+        vencidos:
+          type: integer
+        porcentajeCumplimiento:
+          type: integer
+
+    PromedioTiempo:
+      type: object
+      required: [etapa, nombre, promedioHoras]
+      properties:
+        etapa:
+          type: integer
+        nombre:
+          type: string
+        promedioHoras:
+          type: number
+
+    ProcesoMetrica:
+      type: object
+      required: [id, numeroPreoferta, clienteNombre, estadoActual, prioridad, fechaInicio, slaGlobalHoras, slaVencido]
+      properties:
+        id:
+          type: integer
+        numeroPreoferta:
+          type: string
+        clienteNombre:
+          type: string
+        estadoActual:
+          type: string
+        prioridad:
+          type: string
+        fechaInicio:
+          type: string
+          format: date-time
+        slaGlobalHoras:
+          type: integer
+        slaVencido:
+          type: boolean
+        horasTranscurridas:
+          type: number
+        etapaActual:
+          type: ["integer", "null"]
