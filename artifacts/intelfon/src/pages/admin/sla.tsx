@@ -34,8 +34,10 @@ export default function AdminSla() {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     updateMutation.mutate({
-      slaGlobalHoras: slaGlobal,
-      alertaPorcentaje: alertaPct,
+      data: {
+        slaGlobalHoras: slaGlobal,
+        alertaPorcentaje: alertaPct,
+      },
     });
   };
 

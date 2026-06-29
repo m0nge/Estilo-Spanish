@@ -109,12 +109,14 @@ export default function AdminUsuarios() {
       updateMutation.mutate({ id: editingId, data: updateData });
     } else {
       createMutation.mutate({
-        nombre: form.nombre,
-        email: form.email,
-        password: form.password,
-        rol: form.rol as any,
-        area: form.area,
-        activo: form.activo,
+        data: {
+          nombre: form.nombre,
+          email: form.email,
+          password: form.password,
+          rol: form.rol as any,
+          area: form.area,
+          activo: form.activo,
+        },
       });
     }
   };

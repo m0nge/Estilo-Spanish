@@ -31,6 +31,21 @@ The backend `POST /api/procesos` requires `planSolicitado` or it returns a valid
 
 **Why:** It's part of the commercial pre-offer record.
 
+## Orval mutation hooks always use {data: body} wrapper
+
+All generated mutation hooks from Orval require the body wrapped in `data`. Never call `mutate(bodyFields)` directly.
+
+- ✓ `mutate({ data: { email, password } })` — login
+- ✓ `mutate({ data: { clienteNombre, ... } })` — createProceso
+- ✓ `mutate({ id, data: { ... } })` — updateProceso, updateConfigEtapa, etc.
+- ✓ `mutate({ id, numeroEtapa })` — completarEtapa (no body, no data wrapper)
+- ✓ `mutate({ itemId, data: { completado } })` — toggleChecklistItem
+- ✗ `mutate({ clienteNombre, ... })` — WRONG, body is undefined → 400 Bad Request
+
+**Why:** Orval generates a destructuring `const { data } = props` for mutations with a body. Without the `data` key, the body is `undefined` and the server returns 400.
+
+**How to apply:** Every time you call `.mutate()` on a hook that takes a request body, wrap the body fields in `{ data: {...} }`.
+
 ## JWT stored as intelfon_token
 
 `custom-fetch.ts` reads `localStorage.getItem("intelfon_token")` for auth. The `AuthContext` writes it there on login and clears it on logout.

@@ -38,15 +38,17 @@ export default function CrearProceso() {
     },
   });
 
-  const onSubmit = (data: FormData) => {
+  const onSubmit = (formData: FormData) => {
     createMutation.mutate({
-      clienteNombre: data.clienteNombre,
-      clienteEmail: data.clienteEmail || undefined,
-      clienteTelefono: data.clienteTelefono || undefined,
-      tipoCliente: data.tipoCliente,
-      planSolicitado: data.planSolicitado,
-      cantidadEquipos: data.cantidadEquipos,
-      prioridad: data.prioridad,
+      data: {
+        clienteNombre: formData.clienteNombre,
+        clienteEmail: formData.clienteEmail || undefined,
+        clienteTelefono: formData.clienteTelefono || undefined,
+        tipoCliente: formData.tipoCliente,
+        planSolicitado: formData.planSolicitado,
+        cantidadEquipos: formData.cantidadEquipos,
+        prioridad: formData.prioridad,
+      },
     });
   };
 
