@@ -984,6 +984,8 @@ components:
           type: string
         completado:
           type: boolean
+        areaResponsable:
+          type: ["string", "null"]
         notas:
           type: ["string", "null"]
         fechaCompletado:
@@ -1082,8 +1084,11 @@ components:
           type: array
           items:
             type: object
+            required: [descripcion]
             properties:
               descripcion:
+                type: string
+              area:
                 type: string
         activa:
           type: boolean
@@ -1107,8 +1112,11 @@ components:
           type: array
           items:
             type: object
+            required: [descripcion]
             properties:
               descripcion:
+                type: string
+              area:
                 type: string
         activa:
           type: boolean

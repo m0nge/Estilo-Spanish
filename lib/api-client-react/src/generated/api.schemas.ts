@@ -245,6 +245,8 @@ export interface ChecklistItem {
   descripcion: string;
   completado: boolean;
   /** @nullable */
+  areaResponsable?: string | null;
+  /** @nullable */
   notas?: string | null;
   /** @nullable */
   fechaCompletado?: string | null;
@@ -327,7 +329,8 @@ export interface Notificacion {
 }
 
 export type ConfigEtapaChecklistTemplateItem = {
-  descripcion?: string;
+  descripcion: string;
+  area?: string;
 };
 
 export interface ConfigEtapa {
@@ -344,7 +347,8 @@ export interface ConfigEtapa {
 }
 
 export type ConfigEtapaUpdateChecklistTemplateItem = {
-  descripcion?: string;
+  descripcion: string;
+  area?: string;
 };
 
 export interface ConfigEtapaUpdate {

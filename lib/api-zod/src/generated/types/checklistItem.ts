@@ -12,6 +12,8 @@ export interface ChecklistItem {
   descripcion: string;
   completado: boolean;
   /** @nullable */
+  areaResponsable?: string | null;
+  /** @nullable */
   notas?: string | null;
   /** @nullable */
   fechaCompletado?: Date | null;

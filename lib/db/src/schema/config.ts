@@ -9,7 +9,7 @@ export const configuracionEtapasTable = pgTable("configuracion_etapas", {
   descripcion: text("descripcion"),
   slaHoras: integer("sla_horas").notNull().default(24),
   areasInvolucradas: json("areas_involucradas").$type<string[]>().notNull().default([]),
-  checklistTemplate: json("checklist_template").$type<{ descripcion: string }[]>().notNull().default([]),
+  checklistTemplate: json("checklist_template").$type<{ descripcion: string; area?: string }[]>().notNull().default([]),
   activa: boolean("activa").notNull().default(true),
   ordenVisualizacion: integer("orden_visualizacion").notNull().default(1),
 });

@@ -45,11 +45,12 @@ async function crearEtapasParaProceso(idProceso: number): Promise<void> {
     }).returning();
 
     // Crear checklist items desde el template
-    const template = config.checklistTemplate as { descripcion: string }[];
+    const template = config.checklistTemplate as { descripcion: string; area?: string }[];
     for (const item of template) {
       await db.insert(checklistItemsTable).values({
         idEtapaProceso: etapa[0].id,
         descripcion: item.descripcion,
+        areaResponsable: item.area ?? null,
         completado: false,
       });
     }

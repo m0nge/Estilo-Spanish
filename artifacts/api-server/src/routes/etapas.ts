@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { requireAuth, AuthenticatedRequest } from "../middlewares/auth";
 import { JustificarEtapaBody } from "@workspace/api-zod";
 import { NOMBRES_ETAPAS, calcularSlaVencido, calcularMinutosRestantes } from "./procesos";
+import { emailEtapaLista } from "../lib/email";
 
 const router = Router();
 
@@ -120,6 +121,34 @@ router.post("/procesos/:id/etapas/:numeroEtapa/completar", requireAuth, async (r
         tipo: "etapa_lista",
         titulo: `Fase ${siguienteEtapa} lista - Proceso #${id}`,
         mensaje: `La ${NOMBRES_ETAPAS[siguienteEtapa]} está lista para iniciar`,
+        leido: false,
+      });
+    }
+
+    // Enviar emails a los destinatarios de la siguiente etapa
+    const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
+    const destinatariosEmail = destinatarios.filter(d => d.email);
+    if (destinatariosEmail.length > 0 && proceso) {
+      emailEtapaLista({
+        numeroEtapa: siguienteEtapa,
+        nombreEtapa: NOMBRES_ETAPAS[siguienteEtapa],
+        etapaAnterior: NOMBRES_ETAPAS[numeroEtapa],
+        numeroPreoferta: proceso.numeroPreoferta ?? `#${id}`,
+        clienteNombre: proceso.clienteNombre,
+        procesoId: id,
+        destinatarios: destinatariosEmail.map(d => ({ nombre: d.nombre, email: d.email })),
+      }).catch(() => {}); // No bloquear la respuesta si el email falla
+    }
+  } else if (numeroEtapa === 5) {
+    // Proceso completado — notificar al creador si existe
+    const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
+    if (proceso?.creadoPorId) {
+      await db.insert(notificacionesTable).values({
+        usuarioDestinoId: proceso.creadoPorId,
+        idProceso: id,
+        tipo: "etapa_lista",
+        titulo: `Proceso ${proceso.numeroPreoferta ?? `#${id}`} completado`,
+        mensaje: `El proceso de ${proceso.clienteNombre} ha completado todas las fases`,
         leido: false,
       });
     }

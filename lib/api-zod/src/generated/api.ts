@@ -295,6 +295,7 @@ export const GetEtapaResponse = zod.object({
   "idEtapaProceso": zod.number(),
   "descripcion": zod.string(),
   "completado": zod.boolean(),
+  "areaResponsable": zod.string().nullish(),
   "notas": zod.string().nullish(),
   "fechaCompletado": zod.coerce.date().nullish(),
   "usuarioQuienCompletoId": zod.number().nullish()
@@ -383,6 +384,7 @@ export const GetChecklistResponseItem = zod.object({
   "idEtapaProceso": zod.number(),
   "descripcion": zod.string(),
   "completado": zod.boolean(),
+  "areaResponsable": zod.string().nullish(),
   "notas": zod.string().nullish(),
   "fechaCompletado": zod.coerce.date().nullish(),
   "usuarioQuienCompletoId": zod.number().nullish()
@@ -407,6 +409,7 @@ export const ToggleChecklistItemResponse = zod.object({
   "idEtapaProceso": zod.number(),
   "descripcion": zod.string(),
   "completado": zod.boolean(),
+  "areaResponsable": zod.string().nullish(),
   "notas": zod.string().nullish(),
   "fechaCompletado": zod.coerce.date().nullish(),
   "usuarioQuienCompletoId": zod.number().nullish()
@@ -589,7 +592,8 @@ export const ListConfigEtapasResponseItem = zod.object({
   "slaHoras": zod.number(),
   "areasInvolucradas": zod.array(zod.string()).optional(),
   "checklistTemplate": zod.array(zod.object({
-  "descripcion": zod.string().optional()
+  "descripcion": zod.string(),
+  "area": zod.string().optional()
 })).optional(),
   "activa": zod.boolean(),
   "ordenVisualizacion": zod.number().optional()
@@ -610,7 +614,8 @@ export const UpdateConfigEtapaBody = zod.object({
   "slaHoras": zod.number().optional(),
   "areasInvolucradas": zod.array(zod.string()).optional(),
   "checklistTemplate": zod.array(zod.object({
-  "descripcion": zod.string().optional()
+  "descripcion": zod.string(),
+  "area": zod.string().optional()
 })).optional(),
   "activa": zod.boolean().optional()
 })
@@ -623,7 +628,8 @@ export const UpdateConfigEtapaResponse = zod.object({
   "slaHoras": zod.number(),
   "areasInvolucradas": zod.array(zod.string()).optional(),
   "checklistTemplate": zod.array(zod.object({
-  "descripcion": zod.string().optional()
+  "descripcion": zod.string(),
+  "area": zod.string().optional()
 })).optional(),
   "activa": zod.boolean(),
   "ordenVisualizacion": zod.number().optional()

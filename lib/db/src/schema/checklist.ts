@@ -9,6 +9,7 @@ export const checklistItemsTable = pgTable("checklist_items", {
   idEtapaProceso: integer("id_etapa_proceso").notNull().references(() => etapasProcesoTable.id),
   descripcion: text("descripcion").notNull(),
   completado: boolean("completado").notNull().default(false),
+  areaResponsable: text("area_responsable"),
   usuarioQuienCompletoId: integer("usuario_quien_completo_id").references(() => usuariosTable.id),
   fechaCompletado: timestamp("fecha_completado", { withTimezone: true }),
   notas: text("notas"),

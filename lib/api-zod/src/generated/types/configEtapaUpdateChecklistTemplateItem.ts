@@ -7,5 +7,6 @@
  */
 
 export type ConfigEtapaUpdateChecklistTemplateItem = {
-  descripcion?: string;
+  descripcion: string;
+  area?: string;
 };
