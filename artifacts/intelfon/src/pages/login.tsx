@@ -104,12 +104,27 @@ export default function Login() {
               </Button>
             </form>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-1">
-              <p className="font-medium text-gray-600 mb-2">Usuarios de prueba:</p>
-              <p>admin@intelfon.com — Administrador</p>
-              <p>ventas@intelfon.com — Ventas</p>
-              <p>activaciones@intelfon.com — Activaciones</p>
-              <p className="text-gray-400 mt-1">Contraseña: intelfon2024</p>
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg text-xs text-gray-500 space-y-2">
+              <p className="font-medium text-gray-600 mb-2">Acceso rápido (clic para rellenar):</p>
+              {[
+                { email: "admin@intelfon.com", label: "Admin" },
+                { email: "ventas@intelfon.com", label: "Ventas" },
+                { email: "activaciones@intelfon.com", label: "Activaciones" },
+                { email: "bodega@intelfon.com", label: "Bodega" },
+                { email: "mso@intelfon.com", label: "MSO" },
+                { email: "logistica@intelfon.com", label: "Logística" },
+              ].map((u) => (
+                <button
+                  key={u.email}
+                  type="button"
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 transition-colors flex justify-between items-center"
+                  onClick={() => { setEmail(u.email); setPassword("intelfon2024"); }}
+                >
+                  <span className="text-gray-600">{u.email}</span>
+                  <span className="text-gray-400 ml-2 shrink-0">{u.label}</span>
+                </button>
+              ))}
+              <p className="text-gray-400 pt-1 border-t border-gray-200">Contraseña: <span className="font-mono font-semibold text-gray-600">intelfon2024</span></p>
             </div>
           </CardContent>
         </Card>
