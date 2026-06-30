@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/"
+previewPath = "/intelfon-app/"
 title = "Intelfon - Gestión de Procesos"
 version = "1.0.0"
 id = "artifacts/intelfon-app"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/" ]
+paths = [ "/intelfon-app/" ]
 localPort = 20861
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "20861"
-BASE_PATH = "/"
+BASE_PATH = "/intelfon-app/"

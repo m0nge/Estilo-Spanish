@@ -7,6 +7,7 @@ import checklistRouter from "./checklist";
 import chatRouter from "./chat";
 import notificacionesRouter from "./notificaciones";
 import adminRouter from "./admin";
+import historialRouter from "./historial";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(checklistRouter);
 router.use(chatRouter);
 router.use(notificacionesRouter);
 router.use(adminRouter);
+router.use(historialRouter);
 
 export default router;
