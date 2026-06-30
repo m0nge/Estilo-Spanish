@@ -43,6 +43,63 @@ export async function sendEmail(opts: EmailOptions): Promise<void> {
   }
 }
 
+export function emailSlaAlerta(opts: {
+  tipo: "proximo" | "vencido";
+  numeroPreoferta: string;
+  clienteNombre: string;
+  nombreEtapa: string;
+  numeroEtapa: number;
+  horasRestantes: number;
+  procesoId: number;
+  destinatarios: { nombre: string; email: string }[];
+}): Promise<void> {
+  const { tipo, numeroPreoferta, clienteNombre, nombreEtapa, numeroEtapa, horasRestantes, procesoId, destinatarios } = opts;
+  const esVencido = tipo === "vencido";
+  const subject = esVencido
+    ? `[URGENTE] SLA Vencido — Proceso ${numeroPreoferta}`
+    : `[Alerta] SLA Próximo a Vencer — Proceso ${numeroPreoferta}`;
+
+  const colorHeader = esVencido ? "#991B1B" : "#D97706";
+  const icono = esVencido ? "🚨" : "⚠️";
+  const tiempoTexto = esVencido
+    ? `<strong style="color:#991B1B;">SLA VENCIDO hace ${Math.abs(horasRestantes)}h</strong>`
+    : `Quedan aproximadamente <strong style="color:#D97706;">${horasRestantes}h</strong> antes de que venza el SLA`;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: ${colorHeader}; padding: 20px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size: 20px;">${icono} Alerta SLA — Red Intelfon</h1>
+      </div>
+      <div style="padding: 24px; background: #f9fafb; border: 1px solid #e5e7eb; border-top: none;">
+        <p style="color: #374151; font-size: 16px; margin-top: 0;">
+          ${esVencido
+            ? "Atención: El SLA de una etapa ha vencido y requiere acción inmediata."
+            : "El SLA de una etapa está próximo a vencer. Por favor actúa con urgencia."}
+        </p>
+        <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin: 16px 0;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="color: #6b7280; padding: 4px 0; width: 40%;">Proceso:</td><td style="font-weight: bold; color: #111827;">${numeroPreoferta}</td></tr>
+            <tr><td style="color: #6b7280; padding: 4px 0;">Cliente:</td><td style="font-weight: bold; color: #111827;">${clienteNombre}</td></tr>
+            <tr><td style="color: #6b7280; padding: 4px 0;">Etapa en curso:</td><td style="font-weight: bold; color: ${colorHeader};">Etapa ${numeroEtapa}: ${nombreEtapa}</td></tr>
+            <tr><td style="color: #6b7280; padding: 4px 0;">Estado SLA:</td><td>${tiempoTexto}</td></tr>
+          </table>
+        </div>
+        <div style="text-align: center; margin: 24px 0;">
+          <a href="${process.env.APP_URL ?? "https://tu-app.replit.app"}/tracking/${procesoId}"
+             style="background: ${colorHeader}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+            Ver Proceso Ahora →
+          </a>
+        </div>
+      </div>
+      <div style="padding: 12px; text-align: center; color: #9ca3af; font-size: 12px;">
+        Red Intelfon — Workflow de Activaciones
+      </div>
+    </div>
+  `;
+
+  return sendEmail({ to: destinatarios.map(d => d.email), subject, html });
+}
+
 export function emailEtapaLista(opts: {
   numeroEtapa: number;
   nombreEtapa: string;

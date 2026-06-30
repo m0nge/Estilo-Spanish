@@ -41,14 +41,14 @@ const TIPO_ICONOS: Record<string, ReactNode> = {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { usuario, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
 
   const logoutMutation = useLogout();
 
   const { data: notificaciones = [], refetch: refetchNotifs } = useListNotificaciones({
-    query: { refetchInterval: 30000 },
+    query: { refetchInterval: 10000 },
   });
 
   const marcarLeidaMutation = useMarcarNotificacionLeida();
@@ -60,6 +60,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const handleMarcarLeida = (id: number) => {
     marcarLeidaMutation.mutate({ id }, { onSuccess: () => refetchNotifs() });
+  };
+
+  const handleClickNotif = (notif: { id: number; leido: boolean; idProceso?: number | null }) => {
+    if (!notif.leido) handleMarcarLeida(notif.id);
+    if (notif.idProceso) {
+      setNotifOpen(false);
+      navigate(`/tracking/${notif.idProceso}`);
+    }
   };
 
   const handleLogout = () => {
@@ -200,7 +208,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                         className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors ${
                           !notif.leido ? "bg-red-50/50" : ""
                         }`}
-                        onClick={() => { if (!notif.leido) handleMarcarLeida(notif.id); }}
+                        onClick={() => handleClickNotif(notif)}
                       >
                         <div className="mt-0.5 flex-shrink-0">
                           {TIPO_ICONOS[notif.tipo] ?? <Bell className="h-4 w-4 text-gray-400" />}

@@ -237,16 +237,23 @@ export default function EtapaVista({ idProceso, numeroEtapa }: Props) {
                   onCheckedChange={() => !esCompletada && handleToggle(item.id, item.completado)}
                   className="mt-0.5"
                 />
-                <label
-                  htmlFor={`item-${item.id}`}
-                  className={`text-sm cursor-pointer flex-1 leading-relaxed ${
-                    item.completado ? "line-through text-gray-400" : "text-gray-700"
-                  } ${esCompletada ? "cursor-default" : ""}`}
-                >
-                  {item.descripcion}
-                </label>
+                <div className="flex-1 min-w-0">
+                  <label
+                    htmlFor={`item-${item.id}`}
+                    className={`text-sm cursor-pointer leading-relaxed ${
+                      item.completado ? "line-through text-gray-400" : "text-gray-700"
+                    } ${esCompletada ? "cursor-default" : ""}`}
+                  >
+                    {item.descripcion}
+                  </label>
+                  {item.areaResponsable && (
+                    <p className={`text-xs mt-0.5 font-medium ${item.completado ? "text-gray-300" : "text-red-500"}`}>
+                      {item.areaResponsable}
+                    </p>
+                  )}
+                </div>
                 {item.completado && item.fechaCompletado && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                  <span className="text-xs text-gray-400 whitespace-nowrap self-start mt-0.5">
                     {new Date(item.fechaCompletado).toLocaleDateString("es-CL")}
                   </span>
                 )}

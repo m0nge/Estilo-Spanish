@@ -114,13 +114,14 @@ router.post("/procesos/:id/etapas/:numeroEtapa/completar", requireAuth, async (r
     const usuarios = await db.select().from(usuariosTable).where(eq(usuariosTable.activo, true));
     const destinatarios = usuarios.filter(u => areas.includes(u.rol));
 
+    const [procesoParaNotif] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
     for (const dest of destinatarios) {
       await db.insert(notificacionesTable).values({
         usuarioDestinoId: dest.id,
         idProceso: id,
         tipo: "etapa_lista",
-        titulo: `Fase ${siguienteEtapa} lista - Proceso #${id}`,
-        mensaje: `La ${NOMBRES_ETAPAS[siguienteEtapa]} está lista para iniciar`,
+        titulo: `🔔 Fase ${siguienteEtapa} lista — Orden ${procesoParaNotif?.numeroPreoferta ?? `#${id}`}`,
+        mensaje: `La etapa "${NOMBRES_ETAPAS[siguienteEtapa]}" del proceso de ${procesoParaNotif?.clienteNombre ?? "un cliente"} (${procesoParaNotif?.numeroPreoferta ?? `#${id}`}) está lista para que continúes tu fase.`,
         leido: false,
       });
     }
@@ -142,13 +143,13 @@ router.post("/procesos/:id/etapas/:numeroEtapa/completar", requireAuth, async (r
   } else if (numeroEtapa === 5) {
     // Proceso completado — notificar al creador si existe
     const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
-    if (proceso?.creadoPorId) {
+    if (proceso?.usuarioCreadorId) {
       await db.insert(notificacionesTable).values({
-        usuarioDestinoId: proceso.creadoPorId,
+        usuarioDestinoId: proceso.usuarioCreadorId,
         idProceso: id,
         tipo: "etapa_lista",
-        titulo: `Proceso ${proceso.numeroPreoferta ?? `#${id}`} completado`,
-        mensaje: `El proceso de ${proceso.clienteNombre} ha completado todas las fases`,
+        titulo: `✅ Proceso ${proceso.numeroPreoferta ?? `#${id}`} completado`,
+        mensaje: `El proceso de activación de ${proceso.clienteNombre} ha completado todas las fases exitosamente.`,
         leido: false,
       });
     }
