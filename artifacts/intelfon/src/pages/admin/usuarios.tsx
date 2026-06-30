@@ -101,6 +101,7 @@ export default function AdminUsuarios() {
     if (editingId) {
       const updateData: any = {
         nombre: form.nombre,
+        email: form.email,
         rol: form.rol as any,
         area: form.area,
         activo: form.activo,
@@ -191,12 +192,10 @@ export default function AdminUsuarios() {
               <Label>Nombre completo</Label>
               <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
             </div>
-            {!editingId && (
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required={!editingId} />
+            </div>
             <div className="space-y-2">
               <Label>{editingId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña"}</Label>
               <Input

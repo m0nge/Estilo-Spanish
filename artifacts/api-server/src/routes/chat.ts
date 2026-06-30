@@ -19,6 +19,7 @@ router.get("/procesos/:id/chat/:etapaOrigen/:etapaDestino", requireAuth, async (
     etapaDestino: chatMensajesTable.etapaDestino,
     usuarioRemitenteId: chatMensajesTable.usuarioRemitenteId,
     contenido: chatMensajesTable.contenido,
+    imagenBase64: chatMensajesTable.imagenBase64,
     fechaMensaje: chatMensajesTable.fechaMensaje,
     leido: chatMensajesTable.leido,
     nombreRemitente: usuariosTable.nombre,
@@ -51,7 +52,8 @@ router.post("/procesos/:id/chat/:etapaOrigen/:etapaDestino", requireAuth, async 
     etapaOrigen: Math.min(etapaOrigen, etapaDestino),
     etapaDestino: Math.max(etapaOrigen, etapaDestino),
     usuarioRemitenteId: req.usuario!.id,
-    contenido: parsed.data.contenido,
+    contenido: parsed.data.contenido ?? "",
+    imagenBase64: parsed.data.imagenBase64 ?? null,
     leido: false,
   }).returning();
 
@@ -59,6 +61,7 @@ router.post("/procesos/:id/chat/:etapaOrigen/:etapaDestino", requireAuth, async 
 
   res.status(201).json({
     ...mensaje,
+    imagenBase64: mensaje.imagenBase64 ?? null,
     nombreRemitente: usuario?.nombre ?? "",
     rolRemitente: usuario?.rol ?? "",
   });

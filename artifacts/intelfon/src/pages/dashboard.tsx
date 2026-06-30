@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity, AlertTriangle, CheckCircle2, PlusCircle, Search, ChevronRight, ArrowUpCircle } from "lucide-react";
+import TrackingWidget from "../components/TrackingWidget";
 
 const FASE_NOMBRES = [
   "", "Documentación y Digitalización", "STR y Despacho",
@@ -25,22 +26,28 @@ const ESTADO_LABELS: Record<string, string> = {
   completado: "Completado",
 };
 
-const ESTADO_COLORS: Record<string, string> = {
-  en_espera: "bg-gray-100 text-gray-600 border-gray-200",
-  en_fase_1: "bg-blue-100 text-blue-700 border-blue-200",
-  en_fase_2: "bg-blue-100 text-blue-700 border-blue-200",
-  en_fase_3: "bg-purple-100 text-purple-700 border-purple-200",
-  en_fase_4: "bg-orange-100 text-orange-700 border-orange-200",
-  en_fase_5: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  completado: "bg-green-100 text-green-700 border-green-200",
-};
-
 const PRIORIDAD_COLORS: Record<string, string> = {
   alta: "bg-red-100 text-red-700",
   urgente: "bg-red-200 text-red-800",
   media: "bg-orange-100 text-orange-700",
   baja: "bg-gray-100 text-gray-600",
 };
+
+function getSemaforoEstado(proceso: any): { color: string; borderColor: string; badge: string; badgeClass: string } {
+  if (proceso.estadoActual === "completado") {
+    return { color: "#16a34a", borderColor: "#16a34a", badge: "Completado", badgeClass: "bg-green-100 text-green-700 border-green-200" };
+  }
+  if (proceso.slaVencido) {
+    return { color: "#DC2626", borderColor: "#DC2626", badge: "🔴 SLA Vencido", badgeClass: "bg-red-100 text-red-700 border-red-200" };
+  }
+  if (proceso.minutosRestantes != null && proceso.minutosRestantes < proceso.slaGlobalHoras * 60 * 0.2) {
+    return { color: "#D97706", borderColor: "#D97706", badge: "🟡 SLA Próximo", badgeClass: "bg-amber-100 text-amber-700 border-amber-200" };
+  }
+  if (proceso.prioridad === "alta" || proceso.prioridad === "urgente") {
+    return { color: "#F97316", borderColor: "#F97316", badge: ESTADO_LABELS[proceso.estadoActual] || proceso.estadoActual, badgeClass: "bg-orange-100 text-orange-700 border-orange-200" };
+  }
+  return { color: "#3B82F6", borderColor: "#E5E7EB", badge: ESTADO_LABELS[proceso.estadoActual] || proceso.estadoActual, badgeClass: "bg-blue-100 text-blue-700 border-blue-200" };
+}
 
 export default function Dashboard() {
   const { usuario } = useAuth();
@@ -105,7 +112,7 @@ export default function Dashboard() {
                   <AlertTriangle className="h-8 w-8 text-red-500 flex-shrink-0" />
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.vencidos ?? 0}</p>
-                    <p className="text-xs text-gray-500">SLA Vencido</p>
+                    <p className="text-xs text-gray-500">🔴 SLA Vencido</p>
                   </div>
                 </div>
               </CardContent>
@@ -116,7 +123,7 @@ export default function Dashboard() {
                   <CheckCircle2 className="h-8 w-8 text-green-500 flex-shrink-0" />
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.completados ?? 0}</p>
-                    <p className="text-xs text-gray-500">Completados</p>
+                    <p className="text-xs text-gray-500">✅ Completados</p>
                   </div>
                 </div>
               </CardContent>
@@ -127,7 +134,7 @@ export default function Dashboard() {
                   <ArrowUpCircle className="h-8 w-8 text-orange-400 flex-shrink-0" />
                   <div>
                     <p className="text-2xl font-bold text-gray-900">{stats?.urgentes ?? 0}</p>
-                    <p className="text-xs text-gray-500">Urgentes</p>
+                    <p className="text-xs text-gray-500">🟠 Urgentes</p>
                   </div>
                 </div>
               </CardContent>
@@ -135,6 +142,9 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Tracking Widget */}
+      <TrackingWidget />
 
       {/* Fase distribution */}
       {stats?.porFase && stats.porFase.length > 0 && (
@@ -196,51 +206,45 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          procesosFiltrados.map((proceso) => (
-            <Link key={proceso.id} href={`/tracking/${proceso.id}`}>
-              <Card
-                className="hover:shadow-md transition-shadow cursor-pointer border-l-4"
-                style={{
-                  borderLeftColor: proceso.slaVencido ? "#DC2626"
-                    : proceso.prioridad === "alta" || proceso.prioridad === "urgente" ? "#F97316"
-                    : "#E5E7EB"
-                }}
-              >
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-gray-900 truncate">{proceso.clienteNombre}</span>
-                        {(proceso.prioridad === "alta" || proceso.prioridad === "urgente") && (
-                          <ArrowUpCircle className="h-4 w-4 text-orange-500 flex-shrink-0" />
-                        )}
-                        <Badge variant="outline" className={`text-xs ${ESTADO_COLORS[proceso.estadoActual] || ""}`}>
-                          {ESTADO_LABELS[proceso.estadoActual] || proceso.estadoActual}
-                        </Badge>
-                        <Badge variant="outline" className={`text-xs ${PRIORIDAD_COLORS[proceso.prioridad] || ""}`}>
-                          {proceso.prioridad}
-                        </Badge>
-                        {proceso.slaVencido && (
-                          <Badge variant="outline" className="text-xs bg-red-50 text-red-600 border-red-200">
-                            SLA Vencido
+          procesosFiltrados.map((proceso) => {
+            const semaforo = getSemaforoEstado(proceso);
+            return (
+              <Link key={proceso.id} href={`/tracking/${proceso.id}`}>
+                <Card
+                  className="hover:shadow-md transition-shadow cursor-pointer border-l-4"
+                  style={{ borderLeftColor: semaforo.color }}
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-gray-900 truncate">{proceso.clienteNombre}</span>
+                          {(proceso.prioridad === "alta" || proceso.prioridad === "urgente") && (
+                            <ArrowUpCircle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                          )}
+                          <Badge variant="outline" className={`text-xs ${semaforo.badgeClass}`}>
+                            {semaforo.badge}
                           </Badge>
+                          <Badge variant="outline" className={`text-xs ${PRIORIDAD_COLORS[proceso.prioridad] || ""}`}>
+                            {proceso.prioridad}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-gray-400 font-mono">{proceso.numeroPreoferta}</span>
+                        </div>
+                        {proceso.etapaActual && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Etapa {proceso.etapaActual}: {FASE_NOMBRES[proceso.etapaActual]}
+                          </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-400 font-mono">{proceso.numeroPreoferta}</span>
-                      </div>
-                      {proceso.etapaActual && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Etapa {proceso.etapaActual}: {FASE_NOMBRES[proceso.etapaActual]}
-                        </p>
-                      )}
+                      <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0 mt-1" />
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 flex-shrink-0 mt-1" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })
         )}
       </div>
     </div>

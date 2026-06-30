@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useCallback } from "react";
 import {
   ArrowLeft, CheckCircle2, Circle, AlertTriangle, ChevronRight,
-  Send, MessageSquare, User, ArrowUpCircle
+  MessageSquare, ArrowUpCircle
 } from "lucide-react";
+import ChatBox from "../../components/ChatBox";
+import Cronometro from "../../components/Cronometro";
 
 interface Props {
   id: string;
@@ -26,43 +27,50 @@ const FASE_AREAS = [
   "Bodega/Activaciones", "Activaciones/Logística"
 ];
 
-function EtapaIcon({ estado, numero, actual }: { estado: string; numero: number; actual: boolean }) {
+function EtapaIcon({ estado, numero, actual, slaVencido }: { estado: string; numero: number; actual: boolean; slaVencido?: boolean }) {
   if (estado === "completada") return <CheckCircle2 className="h-6 w-6 text-green-500" />;
-  if (actual) return (
-    <div className="h-6 w-6 rounded-full bg-red-600 text-white flex items-center justify-center text-xs font-bold">
-      {numero}
-    </div>
-  );
+  if (actual) {
+    const bg = slaVencido ? "bg-red-600" : "bg-red-600";
+    return (
+      <div className={`relative h-6 w-6 rounded-full ${bg} text-white flex items-center justify-center text-xs font-bold`}>
+        {slaVencido && <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />}
+        <span className="relative">{numero}</span>
+      </div>
+    );
+  }
   return <Circle className="h-6 w-6 text-gray-300" />;
+}
+
+function getEtapaBg(estado: string, esActual: boolean, slaVencido?: boolean) {
+  if (!esActual) return "hover:bg-gray-50";
+  if (slaVencido) return "bg-red-50 border border-red-300";
+  return "bg-red-50 border border-red-200";
 }
 
 export default function TrackingVista({ id }: Props) {
   const procesoId = parseInt(id);
   const { usuario } = useAuth();
-  const [mensaje, setMensaje] = useState("");
 
   const { data: proceso, isLoading: procesoLoading } = useGetProceso(procesoId, {
-    query: { enabled: !isNaN(procesoId) },
+    query: { enabled: !isNaN(procesoId), refetchInterval: 30000 },
   });
 
-  const { data: mensajes, refetch: refetchMensajes } = useGetChatMensajes(procesoId, 0, 0, {
+  const { data: mensajes = [], refetch: refetchMensajes } = useGetChatMensajes(procesoId, 0, 0, {
     query: { enabled: !isNaN(procesoId) },
   });
 
   const sendMutation = useSendChatMensaje({
-    mutation: {
-      onSuccess: () => {
-        setMensaje("");
-        refetchMensajes();
-      },
-    },
+    mutation: { onSuccess: () => refetchMensajes() },
   });
 
-  const handleSendMensaje = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mensaje.trim()) return;
-    sendMutation.mutate({ id: procesoId, etapaOrigen: 0, etapaDestino: 0, data: { contenido: mensaje.trim() } });
-  };
+  const handleSend = useCallback((contenido: string, imagenBase64?: string) => {
+    sendMutation.mutate({
+      id: procesoId,
+      etapaOrigen: 0,
+      etapaDestino: 0,
+      data: { contenido, imagenBase64 }
+    });
+  }, [procesoId, sendMutation]);
 
   if (procesoLoading) {
     return (
@@ -116,18 +124,28 @@ export default function TrackingVista({ id }: Props) {
             {proceso.codigoR800 && <span className="font-mono text-xs">{proceso.codigoR800}</span>}
           </div>
         </div>
-        <Badge className={proceso.estadoActual === "completado" ? "bg-green-100 text-green-700 border-green-200" :
+        <Badge className={
+          proceso.estadoActual === "completado" ? "bg-green-100 text-green-700 border-green-200" :
           proceso.slaVencido ? "bg-red-100 text-red-700 border-red-200" :
-            "bg-blue-100 text-blue-700 border-blue-200"}>
+          "bg-blue-100 text-blue-700 border-blue-200"
+        }>
           {proceso.estadoActual}
         </Badge>
       </div>
 
-      {/* SLA Global indicator */}
+      {/* Cronómetro general */}
+      {proceso.estadoActual !== "completado" && (
+        <Cronometro
+          fechaInicio={proceso.fechaInicio}
+          slaHoras={proceso.slaGlobalHoras ?? 120}
+          label="Cronómetro general del proceso"
+        />
+      )}
+
       {proceso.slaVencido && (
         <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-          <span>SLA vencido — proceso fuera del tiempo límite de {proceso.slaGlobalHoras}h</span>
+          <span>🔴 SLA vencido — proceso fuera del tiempo límite de {proceso.slaGlobalHoras}h</span>
         </div>
       )}
 
@@ -143,31 +161,38 @@ export default function TrackingVista({ id }: Props) {
               const accesoPermitido = canAcceder(etapa.numeroEtapa);
               const minutosRestantes = etapa.minutosRestantes;
               const horasRestantes = minutosRestantes != null ? Math.abs(Math.round(minutosRestantes / 60)) : null;
+              const slaVencidoEtapa = etapa.slaVencido;
+
+              const semaforoClass = slaVencidoEtapa
+                ? "text-red-600 font-semibold"
+                : minutosRestantes != null && minutosRestantes < (etapa.slaEtapaHoras ?? 24) * 60 * 0.2
+                ? "text-amber-500"
+                : "text-gray-500";
 
               return (
                 <div key={etapa.id}>
                   {idx > 0 && <div className="ml-3 w-px h-3 bg-gray-200" />}
-                  <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                    esActual ? "bg-red-50 border border-red-200" : "hover:bg-gray-50"
-                  }`}>
-                    <EtapaIcon estado={etapa.estado} numero={etapa.numeroEtapa} actual={esActual} />
+                  <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${getEtapaBg(etapa.estado, esActual, slaVencidoEtapa ?? false)}`}>
+                    <EtapaIcon estado={etapa.estado} numero={etapa.numeroEtapa} actual={esActual} slaVencido={slaVencidoEtapa ?? false} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${esActual ? "text-red-700" : "text-gray-700"}`}>
+                      <p className={`text-sm font-medium ${
+                        esActual && slaVencidoEtapa ? "text-red-700" :
+                        esActual ? "text-red-700" : "text-gray-700"
+                      }`}>
                         Etapa {etapa.numeroEtapa}: {etapa.nombreEtapa || FASE_NOMBRES[etapa.numeroEtapa]}
                       </p>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-gray-400">{FASE_AREAS[etapa.numeroEtapa]}</span>
                         {etapa.estado === "completada" && etapa.fechaFin && (
-                          <span className="text-xs text-gray-400">
-                            · {new Date(etapa.fechaFin).toLocaleDateString("es-CL")}
+                          <span className="text-xs text-green-600">
+                            · ✅ {new Date(etapa.fechaFin).toLocaleDateString("es-CL")}
                           </span>
                         )}
-                        {etapa.slaVencido && (
-                          <Badge variant="outline" className="text-xs text-red-600 border-red-200">SLA Vencido</Badge>
-                        )}
                         {esActual && horasRestantes != null && (
-                          <span className={`text-xs ${etapa.slaVencido ? "text-red-600" : "text-gray-500"}`}>
-                            · {etapa.slaVencido ? `${horasRestantes}h vencido` : `${horasRestantes}h restantes`}
+                          <span className={`text-xs ${semaforoClass}`}>
+                            · {slaVencidoEtapa ? `🔴 ${horasRestantes}h vencido` :
+                               horasRestantes < (etapa.slaEtapaHoras ?? 24) * 0.2 ? `🟡 ${horasRestantes}h restantes` :
+                               `🟢 ${horasRestantes}h restantes`}
                           </span>
                         )}
                       </div>
@@ -195,57 +220,15 @@ export default function TrackingVista({ id }: Props) {
             Chat General del Proceso
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 space-y-3">
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {(!mensajes || mensajes.length === 0) ? (
-              <p className="text-sm text-gray-400 text-center py-6">
-                No hay mensajes aún. Inicia la conversación.
-              </p>
-            ) : (
-              mensajes.map((msg) => {
-                const esMio = msg.usuarioRemitenteId === usuario?.id;
-                return (
-                  <div key={msg.id} className={`flex gap-2 ${esMio ? "flex-row-reverse" : ""}`}>
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                      <User className="h-4 w-4 text-gray-500" />
-                    </div>
-                    <div className={`max-w-[80%] ${esMio ? "items-end" : "items-start"} flex flex-col`}>
-                      <div className={`flex items-center gap-2 mb-1 ${esMio ? "flex-row-reverse" : ""}`}>
-                        <span className="text-xs font-medium text-gray-600">{msg.nombreRemitente || msg.rolRemitente}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(msg.fechaMensaje).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      <div className={`p-3 rounded-lg text-sm ${
-                        esMio
-                          ? "bg-red-600 text-white rounded-tr-none"
-                          : "bg-gray-100 text-gray-800 rounded-tl-none"
-                      }`}>
-                        {msg.contenido}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <form onSubmit={handleSendMensaje} className="flex gap-2 pt-2 border-t">
-            <Input
-              placeholder="Escribe un mensaje..."
-              value={mensaje}
-              onChange={(e) => setMensaje(e.target.value)}
-              className="flex-1"
-            />
-            <Button
-              type="submit"
-              size="icon"
-              className="bg-red-600 hover:bg-red-700"
-              disabled={sendMutation.isPending || !mensaje.trim()}
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
+        <CardContent className="pt-0">
+          <ChatBox
+            mensajes={mensajes as any}
+            usuarioId={usuario?.id}
+            isPending={sendMutation.isPending}
+            onSend={handleSend}
+            placeholder="Escribe un mensaje o envía una foto..."
+            maxHeight="max-h-80"
+          />
         </CardContent>
       </Card>
     </div>

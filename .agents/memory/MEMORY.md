@@ -1,1 +1,2 @@
 - [Red Intelfon API conventions](intelfon-api-conventions.md) — SLA times in minutes, estadoActual as snake_case enum, chat endpoint requires etapaOrigen+etapaDestino params
+- [Red Intelfon component architecture](intelfon-components.md) — shared ChatBox + Cronometro components, TrackingWidget in dashboard, chat image column in DB

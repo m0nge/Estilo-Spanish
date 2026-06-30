@@ -432,6 +432,7 @@ export const GetChatMensajesResponseItem = zod.object({
   "etapaDestino": zod.number(),
   "usuarioRemitenteId": zod.number(),
   "contenido": zod.string(),
+  "imagenBase64": zod.string().nullish(),
   "fechaMensaje": zod.coerce.date(),
   "leido": zod.boolean(),
   "nombreRemitente": zod.string().optional(),
@@ -450,7 +451,8 @@ export const SendChatMensajeParams = zod.object({
 })
 
 export const SendChatMensajeBody = zod.object({
-  "contenido": zod.string()
+  "contenido": zod.string().optional().default(""),
+  "imagenBase64": zod.string().optional()
 })
 
 export const SendChatMensajeResponse = zod.object({
@@ -460,6 +462,7 @@ export const SendChatMensajeResponse = zod.object({
   "etapaDestino": zod.number(),
   "usuarioRemitenteId": zod.number(),
   "contenido": zod.string(),
+  "imagenBase64": zod.string().nullish(),
   "fechaMensaje": zod.coerce.date(),
   "leido": zod.boolean(),
   "nombreRemitente": zod.string().optional(),
