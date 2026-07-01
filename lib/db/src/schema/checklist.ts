@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, boolean, integer, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { etapasProcesoTable } from "./etapas";
@@ -13,6 +13,7 @@ export const checklistItemsTable = pgTable("checklist_items", {
   usuarioQuienCompletoId: integer("usuario_quien_completo_id").references(() => usuariosTable.id),
   fechaCompletado: timestamp("fecha_completado", { withTimezone: true }),
   notas: text("notas"),
+  notificarUsuarioIds: json("notificar_usuario_ids").$type<number[]>().notNull().default([]),
 });
 
 export const insertChecklistItemSchema = createInsertSchema(checklistItemsTable).omit({ id: true });

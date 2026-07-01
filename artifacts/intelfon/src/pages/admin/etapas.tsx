@@ -1,282 +1,260 @@
 import { useState } from "react";
-import { useListConfigEtapas, useUpdateConfigEtapa } from "@workspace/api-client-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { customFetch } from "@workspace/api-client-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, ChevronDown, ChevronUp, Clock, Plus, Trash2, GripVertical, ListChecks } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Pencil, Trash2, GripVertical, Loader2, CheckCircle2, Clock, Settings, ArrowUp, ArrowDown } from "lucide-react";
 
-const AREAS = ["Admin", "Ventas", "Activaciones", "Bodega", "MSO", "Logistica"];
-
-interface ChecklistTemplateItem {
-  descripcion: string;
-  area?: string;
+interface ConfigEtapa {
+  id: number;
+  numeroEtapa: number;
+  nombreEtapa: string;
+  descripcion?: string;
+  slaHoras: number;
+  color: string;
+  activa: boolean;
+  ordenVisualizacion: number;
+  areasInvolucradas: string[];
 }
 
-export default function AdminEtapas() {
-  const { toast } = useToast();
-  const [expanded, setExpanded] = useState<number | null>(null);
-  const [editData, setEditData] = useState<Record<number, any>>({});
+const COLORES_PREDEFINIDOS = [
+  "#DC2626","#D97706","#16a34a","#2563EB","#7C3AED",
+  "#DB2777","#0891B2","#65A30D","#EA580C","#9333EA",
+];
 
-  const { data: etapas, isLoading, refetch } = useListConfigEtapas();
-  const updateMutation = useUpdateConfigEtapa({
-    mutation: {
-      onSuccess: () => {
-        toast({ title: "Etapa actualizada", description: "Configuración guardada correctamente." });
-        refetch();
-      },
-      onError: () => {
-        toast({ title: "Error", description: "No se pudo guardar la configuración.", variant: "destructive" });
-      },
-    },
-  });
+function EtapaFormModal({ etapa, open, onClose, onSave }: {
+  etapa?: ConfigEtapa; open: boolean; onClose: () => void; onSave: (data: Partial<ConfigEtapa>) => void;
+}) {
+  const [nombre, setNombre] = useState(etapa?.nombreEtapa ?? "");
+  const [descripcion, setDescripcion] = useState(etapa?.descripcion ?? "");
+  const [slaHoras, setSlaHoras] = useState(String(etapa?.slaHoras ?? 24));
+  const [color, setColor] = useState(etapa?.color ?? "#DC2626");
+  const [areas, setAreas] = useState((etapa?.areasInvolucradas ?? []).join(", "));
 
-  const handleExpand = (id: number, etapa: any) => {
-    if (expanded === id) {
-      setExpanded(null);
-    } else {
-      setExpanded(id);
-      setEditData((prev) => ({
-        ...prev,
-        [id]: {
-          ...etapa,
-          checklistTemplate: (etapa.checklistTemplate as ChecklistTemplateItem[]) ?? [],
-        },
-      }));
-    }
-  };
-
-  const handleSave = (id: number) => {
-    const data = editData[id];
-    updateMutation.mutate({
-      id,
-      data: {
-        slaHoras: data.slaHoras,
-        descripcion: data.descripcion,
-        activa: data.activa,
-        checklistTemplate: data.checklistTemplate,
-      },
-    });
-  };
-
-  // Checklist template helpers
-  const addChecklistItem = (id: number) => {
-    setEditData((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        checklistTemplate: [
-          ...(prev[id].checklistTemplate ?? []),
-          { descripcion: "", area: "" },
-        ],
-      },
-    }));
-  };
-
-  const removeChecklistItem = (id: number, idx: number) => {
-    setEditData((prev) => ({
-      ...prev,
-      [id]: {
-        ...prev[id],
-        checklistTemplate: prev[id].checklistTemplate.filter((_: any, i: number) => i !== idx),
-      },
-    }));
-  };
-
-  const updateChecklistItem = (id: number, idx: number, field: "descripcion" | "area", value: string) => {
-    setEditData((prev) => {
-      const items = [...prev[id].checklistTemplate];
-      items[idx] = { ...items[idx], [field]: value };
-      return { ...prev, [id]: { ...prev[id], checklistTemplate: items } };
+  const handleSave = () => {
+    if (!nombre.trim()) return;
+    onSave({
+      nombreEtapa: nombre.trim(),
+      descripcion: descripcion.trim() || undefined,
+      slaHoras: parseInt(slaHoras) || 24,
+      color,
+      areasInvolucradas: areas.split(",").map(a => a.trim()).filter(Boolean),
     });
   };
 
   return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{etapa ? "Editar Etapa" : "Nueva Etapa"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Nombre <span className="text-red-500">*</span></Label>
+            <Input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Documentación y Digitalización" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Descripción</Label>
+            <Input value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Descripción opcional" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>SLA (horas laborales)</Label>
+            <Input type="number" min={1} value={slaHoras} onChange={e => setSlaHoras(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Áreas involucradas (separadas por coma)</Label>
+            <Input value={areas} onChange={e => setAreas(e.target.value)} placeholder="Ventas, Activaciones, Bodega" />
+          </div>
+          <div className="space-y-2">
+            <Label>Color</Label>
+            <div className="flex flex-wrap gap-2 items-center">
+              {COLORES_PREDEFINIDOS.map(c => (
+                <button key={c} type="button"
+                  className={`h-7 w-7 rounded-full border-2 transition-all ${color === c ? "border-gray-900 scale-110" : "border-transparent"}`}
+                  style={{ backgroundColor: c }} onClick={() => setColor(c)} />
+              ))}
+              <input type="color" value={color} onChange={e => setColor(e.target.value)}
+                className="h-7 w-7 rounded cursor-pointer border border-gray-200" title="Color personalizado" />
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-xs text-gray-500 font-mono">{color}</span>
+            </div>
+          </div>
+        </div>
+        <DialogFooter className="gap-2 mt-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button className="bg-red-600 hover:bg-red-700 text-white" disabled={!nombre.trim()} onClick={handleSave}>
+            {etapa ? "Guardar cambios" : "Crear etapa"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default function AdminEtapas() {
+  const qc = useQueryClient();
+  const [editando, setEditando] = useState<ConfigEtapa | null>(null);
+  const [creando, setCreando] = useState(false);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const { data: etapas = [], isLoading } = useQuery<ConfigEtapa[]>({
+    queryKey: ["admin-etapas"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/etapas", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("intelfon_token")}` }
+      });
+      if (!res.ok) throw new Error("Error cargando etapas");
+      return res.json();
+    },
+  });
+
+  const sorted = [...etapas].sort((a, b) => a.ordenVisualizacion - b.ordenVisualizacion);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-etapas"] });
+
+  const showSuccess = (msg: string) => {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(null), 3000);
+  };
+
+  const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("intelfon_token")}`, "Content-Type": "application/json" });
+
+  const updateMut = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<ConfigEtapa> }) => {
+      const res = await fetch(`/api/admin/etapas/${id}`, { method: "PUT", headers: authHeader(), body: JSON.stringify(data) });
+      if (!res.ok) throw new Error("Error actualizando");
+    },
+    onSuccess: () => { invalidate(); setEditando(null); showSuccess("Etapa actualizada"); },
+  });
+
+  const createMut = useMutation({
+    mutationFn: async (data: Partial<ConfigEtapa>) => {
+      const res = await fetch("/api/admin/etapas", { method: "POST", headers: authHeader(), body: JSON.stringify(data) });
+      if (!res.ok) throw new Error("Error creando");
+    },
+    onSuccess: () => { invalidate(); setCreando(false); showSuccess("Etapa creada"); },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: number) => {
+      await fetch(`/api/admin/etapas/${id}`, { method: "DELETE", headers: authHeader() });
+    },
+    onSuccess: () => { invalidate(); showSuccess("Etapa desactivada"); },
+  });
+
+  const moverMut = useMutation({
+    mutationFn: async (orden: { id: number; ordenVisualizacion: number }[]) => {
+      await fetch("/api/admin/etapas-orden", { method: "PUT", headers: authHeader(), body: JSON.stringify(orden) });
+    },
+    onSuccess: () => invalidate(),
+  });
+
+  const mover = (idx: number, dir: -1 | 1) => {
+    const arr = [...sorted];
+    const target = arr[idx + dir];
+    if (!target) return;
+    const nuevoOrden = arr.map((e, i) => {
+      if (i === idx) return { id: e.id, ordenVisualizacion: target.ordenVisualizacion };
+      if (i === idx + dir) return { id: e.id, ordenVisualizacion: arr[idx].ordenVisualizacion };
+      return { id: e.id, ordenVisualizacion: e.ordenVisualizacion };
+    });
+    moverMut.mutate(nuevoOrden);
+  };
+
+  return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Configuración de Etapas</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Administra los SLA, checklist y configuraciones de cada fase del workflow</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Configuración de Etapas</h2>
+          <p className="text-sm text-gray-500">Administra las fases del proceso de activación</p>
+        </div>
+        <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => setCreando(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Nueva Etapa
+        </Button>
       </div>
 
-      <div className="space-y-3">
-        {isLoading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i}><CardContent className="pt-4"><Skeleton className="h-16" /></CardContent></Card>
-          ))
-        ) : (
-          (etapas || []).map((etapa) => {
-            const templateItems: ChecklistTemplateItem[] = (editData[etapa.id]?.checklistTemplate) ?? (etapa.checklistTemplate as ChecklistTemplateItem[]) ?? [];
-            return (
-              <Card key={etapa.id} className={`transition-all ${expanded === etapa.id ? "ring-2 ring-red-200" : ""}`}>
-                <div
-                  className="flex items-center justify-between p-4 cursor-pointer"
-                  onClick={() => handleExpand(etapa.id, etapa)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full bg-red-600 text-white flex items-center justify-center font-bold flex-shrink-0">
-                      {etapa.numeroEtapa}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{etapa.nombreEtapa}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Clock className="h-3 w-3 text-gray-400" />
-                        <span className="text-xs text-gray-500">SLA: {etapa.slaHoras}h</span>
-                        <ListChecks className="h-3 w-3 text-gray-400 ml-1" />
-                        <span className="text-xs text-gray-500">
-                          {(etapa.checklistTemplate as ChecklistTemplateItem[])?.length ?? 0} tareas
-                        </span>
-                        <Badge variant="outline" className={etapa.activa ? "text-green-600 border-green-200" : "text-gray-400"}>
-                          {etapa.activa ? "Activa" : "Inactiva"}
-                        </Badge>
-                      </div>
-                    </div>
+      {success && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-700">{success}</AlertDescription>
+        </Alert>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gray-400" /></div>
+      ) : sorted.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-gray-400">No hay etapas. Crea la primera.</CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {sorted.map((etapa, idx) => (
+            <Card key={etapa.id} className={`border-l-4 ${!etapa.activa ? "opacity-60" : ""}`} style={{ borderLeftColor: etapa.color }}>
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-gray-300 hover:text-gray-600"
+                      disabled={idx === 0 || moverMut.isPending} onClick={() => mover(idx, -1)}>
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                    <GripVertical className="h-4 w-4 text-gray-300 mx-auto" />
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-gray-300 hover:text-gray-600"
+                      disabled={idx === sorted.length - 1 || moverMut.isPending} onClick={() => mover(idx, 1)}>
+                      <ArrowDown className="h-3 w-3" />
+                    </Button>
                   </div>
-                  {expanded === etapa.id ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
-                </div>
 
-                {expanded === etapa.id && editData[etapa.id] && (
-                  <div className="border-t border-gray-100 p-4 space-y-5">
-                    {/* SLA y Estado */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>SLA (horas)</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={editData[etapa.id].slaHoras}
-                          onChange={(e) => setEditData((prev) => ({
-                            ...prev,
-                            [etapa.id]: { ...prev[etapa.id], slaHoras: parseInt(e.target.value) }
-                          }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Estado</Label>
-                        <select
-                          className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                          value={editData[etapa.id].activa ? "activa" : "inactiva"}
-                          onChange={(e) => setEditData((prev) => ({
-                            ...prev,
-                            [etapa.id]: { ...prev[etapa.id], activa: e.target.value === "activa" }
-                          }))}
-                        >
-                          <option value="activa">Activa</option>
-                          <option value="inactiva">Inactiva</option>
-                        </select>
-                      </div>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{ backgroundColor: etapa.color }}>
+                    {etapa.numeroEtapa}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-900">{etapa.nombreEtapa}</span>
+                      {!etapa.activa && <Badge variant="secondary" className="text-xs">Inactiva</Badge>}
                     </div>
-
-                    <div className="space-y-2">
-                      <Label>Descripción</Label>
-                      <Textarea
-                        rows={2}
-                        value={editData[etapa.id].descripcion || ""}
-                        onChange={(e) => setEditData((prev) => ({
-                          ...prev,
-                          [etapa.id]: { ...prev[etapa.id], descripcion: e.target.value }
-                        }))}
-                      />
-                    </div>
-
-                    {etapa.areasInvolucradas && etapa.areasInvolucradas.length > 0 && (
-                      <div className="space-y-2">
-                        <Label>Áreas Involucradas</Label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(etapa.areasInvolucradas as string[]).map((area) => (
-                            <Badge key={area} variant="secondary" className="text-xs">{area}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Checklist Template */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold flex items-center gap-2">
-                          <ListChecks className="h-4 w-4" />
-                          Checklist de Tareas
-                        </Label>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 h-7 text-xs"
-                          onClick={() => addChecklistItem(etapa.id)}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" />
-                          Agregar tarea
-                        </Button>
-                      </div>
-
-                      {templateItems.length === 0 ? (
-                        <div className="border border-dashed border-gray-200 rounded-md py-6 text-center">
-                          <ListChecks className="h-6 w-6 text-gray-300 mx-auto mb-1.5" />
-                          <p className="text-xs text-gray-400">Sin tareas de checklist. Haz clic en "Agregar tarea" para crear una.</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {templateItems.map((item, idx) => (
-                            <div key={idx} className="flex items-center gap-2 group">
-                              <GripVertical className="h-4 w-4 text-gray-300 flex-shrink-0 cursor-grab" />
-                              <Input
-                                className="flex-1 h-9 text-sm"
-                                placeholder="Descripción de la tarea..."
-                                value={item.descripcion}
-                                onChange={(e) => updateChecklistItem(etapa.id, idx, "descripcion", e.target.value)}
-                              />
-                              <select
-                                className="h-9 px-2 rounded-md border border-input bg-background text-xs w-36 flex-shrink-0"
-                                value={item.area ?? ""}
-                                onChange={(e) => updateChecklistItem(etapa.id, idx, "area", e.target.value)}
-                                title="Área responsable de esta tarea"
-                              >
-                                <option value="">Sin área</option>
-                                {AREAS.map((a) => (
-                                  <option key={a} value={a}>{a}</option>
-                                ))}
-                              </select>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-gray-400 hover:text-red-600 flex-shrink-0"
-                                onClick={() => removeChecklistItem(etapa.id, idx)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-xs text-gray-500 flex-wrap">
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3" />SLA: {etapa.slaHoras}h laborales</span>
+                      {(etapa.areasInvolucradas ?? []).length > 0 && (
+                        <span className="flex items-center gap-1"><Settings className="h-3 w-3" />{etapa.areasInvolucradas.join(", ")}</span>
                       )}
-                      <p className="text-xs text-gray-400 mt-1">
-                        Estas tareas se asignarán a cada proceso nuevo que pase por esta etapa. El área indica quién debe marcarla.
-                      </p>
-                    </div>
-
-                    <div className="flex justify-end pt-1">
-                      <Button
-                        className="bg-red-600 hover:bg-red-700"
-                        onClick={() => handleSave(etapa.id)}
-                        disabled={updateMutation.isPending}
-                      >
-                        {updateMutation.isPending ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Guardando...</>
-                        ) : (
-                          <><Save className="mr-2 h-4 w-4" />Guardar Cambios</>
-                        )}
-                      </Button>
+                      <span className="flex items-center gap-1">
+                        <div className="h-3 w-3 rounded-full" style={{ backgroundColor: etapa.color }} />
+                        <span className="font-mono text-gray-300">{etapa.color}</span>
+                      </span>
                     </div>
                   </div>
-                )}
-              </Card>
-            );
-          })
-        )}
-      </div>
+
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => setEditando(etapa)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    {etapa.activa && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-400 hover:text-red-600"
+                        onClick={() => { if (confirm("¿Desactivar esta etapa?")) deleteMut.mutate(etapa.id); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {creando && (
+        <EtapaFormModal open={creando} onClose={() => setCreando(false)} onSave={data => createMut.mutate(data)} />
+      )}
+      {editando && (
+        <EtapaFormModal etapa={editando} open={!!editando} onClose={() => setEditando(null)}
+          onSave={data => updateMut.mutate({ id: editando!.id, data })} />
+      )}
     </div>
   );
 }

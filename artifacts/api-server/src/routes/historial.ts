@@ -2,7 +2,8 @@ import { Router } from "express";
 import { db, etapasProcesoTable, procesosTable, usuariosTable, checklistItemsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
-import { NOMBRES_ETAPAS, calcularSlaVencido } from "./procesos";
+import { calcularSlaVencidoLaboral } from "../lib/businessHours";
+import { configuracionEtapasTable } from "@workspace/db";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.get("/procesos/:id/historial", requireAuth, async (req, res): Promise<voi
   });
 
   for (const etapa of etapas) {
-    const nombreEtapa = NOMBRES_ETAPAS[etapa.numeroEtapa] ?? `Etapa ${etapa.numeroEtapa}`;
+    const nombreEtapa = `Etapa ${etapa.numeroEtapa}`; // nombre dinámico
     const completadoPor = etapa.completadoPorId ? usuarioMap.get(etapa.completadoPorId) : null;
 
     // Evento: etapa iniciada
@@ -70,7 +71,7 @@ router.get("/procesos/:id/historial", requireAuth, async (req, res): Promise<voi
 
     // Evento: etapa completada
     if (etapa.estado === "completada" && etapa.fechaFin) {
-      const slaVencida = etapa.fechaInicio ? calcularSlaVencido(etapa.fechaInicio, etapa.slaEtapaHoras) : false;
+      const slaVencida = etapa.fechaInicio ? calcularSlaVencidoLaboral(etapa.fechaInicio, etapa.slaEtapaHoras) : false;
       const duracionMs = etapa.fechaFin.getTime() - (etapa.fechaInicio?.getTime() ?? etapa.fechaFin.getTime());
       const duracionH = Math.round(duracionMs / 3600000 * 10) / 10;
 

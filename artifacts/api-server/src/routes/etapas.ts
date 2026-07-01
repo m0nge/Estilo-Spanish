@@ -3,38 +3,39 @@ import { db, etapasProcesoTable, checklistItemsTable, procesosTable, notificacio
 import { eq, and } from "drizzle-orm";
 import { requireAuth, AuthenticatedRequest } from "../middlewares/auth";
 import { JustificarEtapaBody } from "@workspace/api-zod";
-import { NOMBRES_ETAPAS, calcularSlaVencido, calcularMinutosRestantes } from "./procesos";
+import { calcularSlaVencidoLaboral, calcularMinutosRestantesLaboral } from "../lib/businessHours";
 import { emailEtapaLista } from "../lib/email";
 
 const router = Router();
 
-function generateCodigo(prefix: string): string {
-  const year = new Date().getFullYear();
-  const month = String(new Date().getMonth() + 1).padStart(2, "0");
-  const num = String(Math.floor(Math.random() * 99999) + 1).padStart(5, "0");
-  return `${prefix}-${year}-${month}-${num}`;
-}
-
-async function getAreasEtapa(numeroEtapa: number): Promise<string[]> {
-  const [config] = await db.select().from(configuracionEtapasTable).where(eq(configuracionEtapasTable.numeroEtapa, numeroEtapa));
-  return (config?.areasInvolucradas as string[]) ?? [];
+async function getConfigMap(): Promise<Record<number, { nombre: string; color: string; areas: string[]; descripcion?: string }>> {
+  const configs = await db.select().from(configuracionEtapasTable);
+  const map: Record<number, { nombre: string; color: string; areas: string[]; descripcion?: string }> = {};
+  for (const c of configs) {
+    map[c.numeroEtapa] = {
+      nombre: c.nombreEtapa,
+      color: c.color,
+      areas: (c.areasInvolucradas as string[]) ?? [],
+      descripcion: c.descripcion ?? undefined,
+    };
+  }
+  return map;
 }
 
 // GET /procesos/:id/etapas
 router.get("/procesos/:id/etapas", requireAuth, async (req, res): Promise<void> => {
   const id = parseInt(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id, 10);
-
   const etapas = await db.select().from(etapasProcesoTable)
     .where(eq(etapasProcesoTable.idProceso, id))
     .orderBy(etapasProcesoTable.numeroEtapa);
-
+  const configMap = await getConfigMap();
   const result = etapas.map(e => ({
     ...e,
-    nombreEtapa: NOMBRES_ETAPAS[e.numeroEtapa],
-    slaVencido: e.fechaInicio ? calcularSlaVencido(e.fechaInicio, e.slaEtapaHoras) : false,
-    minutosRestantes: e.fechaInicio ? calcularMinutosRestantes(e.fechaInicio, e.slaEtapaHoras) : null,
+    nombreEtapa: configMap[e.numeroEtapa]?.nombre ?? `Etapa ${e.numeroEtapa}`,
+    color: configMap[e.numeroEtapa]?.color ?? "#DC2626",
+    slaVencido: e.fechaInicio ? calcularSlaVencidoLaboral(e.fechaInicio, e.slaEtapaHoras) : false,
+    minutosRestantes: e.fechaInicio ? calcularMinutosRestantesLaboral(e.fechaInicio, e.slaEtapaHoras) : null,
   }));
-
   res.json(result);
 });
 
@@ -45,22 +46,23 @@ router.get("/procesos/:id/etapas/:numeroEtapa", requireAuth, async (req, res): P
 
   const [etapa] = await db.select().from(etapasProcesoTable)
     .where(and(eq(etapasProcesoTable.idProceso, id), eq(etapasProcesoTable.numeroEtapa, numeroEtapa)));
-
   if (!etapa) { res.status(404).json({ error: "Etapa no encontrada" }); return; }
 
   const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
   const checklist = await db.select().from(checklistItemsTable).where(eq(checklistItemsTable.idEtapaProceso, etapa.id));
-  const [config] = await db.select().from(configuracionEtapasTable).where(eq(configuracionEtapasTable.numeroEtapa, numeroEtapa));
+  const configMap = await getConfigMap();
+  const cfg = configMap[numeroEtapa];
 
   res.json({
     ...etapa,
-    nombreEtapa: NOMBRES_ETAPAS[numeroEtapa],
-    descripcionEtapa: config?.descripcion ?? null,
-    areasInvolucradas: (config?.areasInvolucradas as string[]) ?? [],
-    slaVencido: etapa.fechaInicio ? calcularSlaVencido(etapa.fechaInicio, etapa.slaEtapaHoras) : false,
-    minutosRestantes: etapa.fechaInicio ? calcularMinutosRestantes(etapa.fechaInicio, etapa.slaEtapaHoras) : null,
+    nombreEtapa: cfg?.nombre ?? `Etapa ${numeroEtapa}`,
+    color: cfg?.color ?? "#DC2626",
+    descripcionEtapa: cfg?.descripcion ?? null,
+    areasInvolucradas: cfg?.areas ?? [],
+    slaVencido: etapa.fechaInicio ? calcularSlaVencidoLaboral(etapa.fechaInicio, etapa.slaEtapaHoras) : false,
+    minutosRestantes: etapa.fechaInicio ? calcularMinutosRestantesLaboral(etapa.fechaInicio, etapa.slaEtapaHoras) : null,
     checklist,
-    proceso: proceso ? { ...proceso, etapaActual: numeroEtapa, slaVencido: calcularSlaVencido(proceso.fechaInicio, proceso.slaGlobalHoras) } : null,
+    proceso: proceso ? { ...proceso, etapaActual: numeroEtapa, slaVencido: etapa.fechaInicio ? calcularSlaVencidoLaboral(etapa.fechaInicio, etapa.slaEtapaHoras) : false } : null,
   });
 });
 
@@ -71,94 +73,99 @@ router.post("/procesos/:id/etapas/:numeroEtapa/completar", requireAuth, async (r
 
   const [etapa] = await db.select().from(etapasProcesoTable)
     .where(and(eq(etapasProcesoTable.idProceso, id), eq(etapasProcesoTable.numeroEtapa, numeroEtapa)));
-
   if (!etapa) { res.status(404).json({ error: "Etapa no encontrada" }); return; }
 
-  // Verificar checklist
   const items = await db.select().from(checklistItemsTable).where(eq(checklistItemsTable.idEtapaProceso, etapa.id));
   const allCompleted = items.length === 0 || items.every(i => i.completado);
-
   if (!allCompleted) {
     res.status(400).json({ error: "Debe completar todos los items del checklist antes de avanzar" });
     return;
   }
 
-  // Marcar etapa como completada
   const [updated] = await db.update(etapasProcesoTable)
     .set({ estado: "completada", fechaFin: new Date(), checklistCompletado: true, completadoPorId: req.usuario!.id })
     .where(eq(etapasProcesoTable.id, etapa.id))
     .returning();
 
-  // Generar códigos automáticos
+  // Generar códigos automáticos (mantener compatibilidad)
   if (numeroEtapa === 2) {
-    await db.update(procesosTable).set({ codigoStr: generateCodigo("STR") }).where(eq(procesosTable.id, id));
+    await db.update(procesosTable).set({ codigoStr: `STR-${Date.now()}` }).where(eq(procesosTable.id, id));
   } else if (numeroEtapa === 3) {
-    await db.update(procesosTable).set({ codigoB800: generateCodigo("B800") }).where(eq(procesosTable.id, id));
-  } else if (numeroEtapa === 5) {
-    await db.update(procesosTable).set({ codigoR800: generateCodigo("R800"), estadoActual: "completado", fechaFinReal: new Date() }).where(eq(procesosTable.id, id));
+    await db.update(procesosTable).set({ codigoB800: `B800-${Date.now()}` }).where(eq(procesosTable.id, id));
   }
 
-  // Activar siguiente etapa
-  if (numeroEtapa < 5) {
-    const siguienteEtapa = numeroEtapa + 1;
+  // Obtener todas las etapas del proceso para determinar siguiente
+  const todasEtapas = await db.select().from(etapasProcesoTable)
+    .where(eq(etapasProcesoTable.idProceso, id))
+    .orderBy(etapasProcesoTable.numeroEtapa);
+  const configMap = await getConfigMap();
+  const currentIdx = todasEtapas.findIndex(e => e.numeroEtapa === numeroEtapa);
+  const siguienteEtapa = todasEtapas[currentIdx + 1];
+
+  if (siguienteEtapa) {
     await db.update(etapasProcesoTable)
       .set({ estado: "activa", fechaInicio: new Date() })
-      .where(and(eq(etapasProcesoTable.idProceso, id), eq(etapasProcesoTable.numeroEtapa, siguienteEtapa)));
-
+      .where(eq(etapasProcesoTable.id, siguienteEtapa.id));
     await db.update(procesosTable)
-      .set({ estadoActual: `en_fase_${siguienteEtapa}` as any })
+      .set({ estadoActual: `en_fase_${siguienteEtapa.numeroEtapa}` as any })
       .where(eq(procesosTable.id, id));
 
     // Notificar a usuarios de la siguiente etapa
-    const areas = await getAreasEtapa(siguienteEtapa);
-    const usuarios = await db.select().from(usuariosTable).where(eq(usuariosTable.activo, true));
-    const destinatarios = usuarios.filter(u => areas.includes(u.rol));
-
+    const areas = configMap[siguienteEtapa.numeroEtapa]?.areas ?? [];
+    const nombreSiguiente = configMap[siguienteEtapa.numeroEtapa]?.nombre ?? `Etapa ${siguienteEtapa.numeroEtapa}`;
+    const nombreActual = configMap[numeroEtapa]?.nombre ?? `Etapa ${numeroEtapa}`;
+    const todos = await db.select().from(usuariosTable).where(eq(usuariosTable.activo, true));
+    const destinatarios = todos.filter(u => areas.includes(u.rol));
     const [procesoParaNotif] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
+
     for (const dest of destinatarios) {
       await db.insert(notificacionesTable).values({
         usuarioDestinoId: dest.id,
         idProceso: id,
         tipo: "etapa_lista",
-        titulo: `🔔 Fase ${siguienteEtapa} lista — Orden ${procesoParaNotif?.numeroPreoferta ?? `#${id}`}`,
-        mensaje: `La etapa "${NOMBRES_ETAPAS[siguienteEtapa]}" del proceso de ${procesoParaNotif?.clienteNombre ?? "un cliente"} (${procesoParaNotif?.numeroPreoferta ?? `#${id}`}) está lista para que continúes tu fase.`,
+        titulo: `🔔 ${nombreSiguiente} lista — Orden ${procesoParaNotif?.numeroPreoferta ?? `#${id}`}`,
+        mensaje: `La etapa "${nombreSiguiente}" de la orden ${procesoParaNotif?.numeroPreoferta ?? `#${id}`} está lista para continuar.`,
         leido: false,
-      });
+      }).catch(() => {});
     }
 
-    // Enviar emails a los destinatarios de la siguiente etapa
-    const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
-    const destinatariosEmail = destinatarios.filter(d => d.email);
-    if (destinatariosEmail.length > 0 && proceso) {
+    const destEmail = destinatarios.filter(d => d.email);
+    if (destEmail.length > 0 && procesoParaNotif) {
       emailEtapaLista({
-        numeroEtapa: siguienteEtapa,
-        nombreEtapa: NOMBRES_ETAPAS[siguienteEtapa],
-        etapaAnterior: NOMBRES_ETAPAS[numeroEtapa],
-        numeroPreoferta: proceso.numeroPreoferta ?? `#${id}`,
-        clienteNombre: proceso.clienteNombre,
+        numeroEtapa: siguienteEtapa.numeroEtapa,
+        nombreEtapa: nombreSiguiente,
+        etapaAnterior: nombreActual,
+        numeroPreoferta: procesoParaNotif.numeroPreoferta ?? `#${id}`,
+        clienteNombre: procesoParaNotif.clienteNombre ?? procesoParaNotif.numeroPreoferta,
         procesoId: id,
-        destinatarios: destinatariosEmail.map(d => ({ nombre: d.nombre, email: d.email })),
-      }).catch(() => {}); // No bloquear la respuesta si el email falla
+        destinatarios: destEmail.map(d => ({ nombre: d.nombre, email: d.email })),
+      }).catch(() => {});
     }
-  } else if (numeroEtapa === 5) {
-    // Proceso completado — notificar al creador si existe
-    const [proceso] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
-    if (proceso?.usuarioCreadorId) {
+  } else {
+    // Última etapa — proceso completado
+    await db.update(procesosTable)
+      .set({ estadoActual: "completado", fechaFinReal: new Date(), codigoR800: `R800-${Date.now()}` })
+      .where(eq(procesosTable.id, id));
+
+    const [procesoFinal] = await db.select().from(procesosTable).where(eq(procesosTable.id, id));
+    if (procesoFinal?.usuarioCreadorId) {
       await db.insert(notificacionesTable).values({
-        usuarioDestinoId: proceso.usuarioCreadorId,
+        usuarioDestinoId: procesoFinal.usuarioCreadorId,
         idProceso: id,
         tipo: "etapa_lista",
-        titulo: `✅ Proceso ${proceso.numeroPreoferta ?? `#${id}`} completado`,
-        mensaje: `El proceso de activación de ${proceso.clienteNombre} ha completado todas las fases exitosamente.`,
+        titulo: `✅ Proceso ${procesoFinal.numeroPreoferta ?? `#${id}`} completado`,
+        mensaje: `El proceso de activación ${procesoFinal.numeroPreoferta} ha completado todas las fases exitosamente.`,
         leido: false,
-      });
+      }).catch(() => {});
     }
   }
 
+  const cfg = configMap[numeroEtapa];
   res.json({
     ...updated,
-    nombreEtapa: NOMBRES_ETAPAS[numeroEtapa],
-    slaVencido: updated.fechaInicio ? calcularSlaVencido(updated.fechaInicio, updated.slaEtapaHoras) : false,
+    nombreEtapa: cfg?.nombre ?? `Etapa ${numeroEtapa}`,
+    color: cfg?.color ?? "#DC2626",
+    slaVencido: updated.fechaInicio ? calcularSlaVencidoLaboral(updated.fechaInicio, updated.slaEtapaHoras) : false,
     minutosRestantes: null,
   });
 });
@@ -178,11 +185,15 @@ router.post("/procesos/:id/etapas/:numeroEtapa/justificar", requireAuth, async (
 
   if (!updated) { res.status(404).json({ error: "Etapa no encontrada" }); return; }
 
+  const configMap = await getConfigMap();
+  const cfg = configMap[numeroEtapa];
+
   res.json({
     ...updated,
-    nombreEtapa: NOMBRES_ETAPAS[numeroEtapa],
-    slaVencido: updated.fechaInicio ? calcularSlaVencido(updated.fechaInicio, updated.slaEtapaHoras) : false,
-    minutosRestantes: updated.fechaInicio ? calcularMinutosRestantes(updated.fechaInicio, updated.slaEtapaHoras) : null,
+    nombreEtapa: cfg?.nombre ?? `Etapa ${numeroEtapa}`,
+    color: cfg?.color ?? "#DC2626",
+    slaVencido: updated.fechaInicio ? calcularSlaVencidoLaboral(updated.fechaInicio, updated.slaEtapaHoras) : false,
+    minutosRestantes: updated.fechaInicio ? calcularMinutosRestantesLaboral(updated.fechaInicio, updated.slaEtapaHoras) : null,
   });
 });
 

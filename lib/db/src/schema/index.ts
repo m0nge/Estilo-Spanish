@@ -5,3 +5,4 @@ export * from "./checklist";
 export * from "./chat";
 export * from "./notificaciones";
 export * from "./config";
+export * from "./bitacora";
