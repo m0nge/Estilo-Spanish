@@ -90,7 +90,7 @@ router.get("/procesos", requireAuth, async (req: AuthenticatedRequest, res): Pro
       etapaActual: etapaActiva?.numeroEtapa ?? null,
       slaVencido,
       minutosRestantes,
-      slaGlobalHoras: etapaActiva?.slaEtapaHoras ?? p.slaGlobalHoras,
+      slaGlobalHoras: etapas.reduce((sum, e) => sum + e.slaEtapaHoras, 0) || p.slaGlobalHoras,
     };
   }));
 
@@ -179,12 +179,13 @@ router.get("/procesos/:id", requireAuth, async (req, res): Promise<void> => {
   }));
 
   const slaVencido = etapaActiva?.fechaInicio ? calcularSlaVencidoLaboral(etapaActiva.fechaInicio, etapaActiva.slaEtapaHoras) : false;
+  const slaGlobalHorasTotal = etapas.reduce((sum, e) => sum + e.slaEtapaHoras, 0) || proceso.slaGlobalHoras;
 
   res.json({
     ...proceso,
     etapaActual: etapaActiva?.numeroEtapa ?? null,
     slaVencido,
-    slaGlobalHoras: etapaActiva?.slaEtapaHoras ?? proceso.slaGlobalHoras,
+    slaGlobalHoras: slaGlobalHorasTotal,
     etapas: etapasConInfo,
   });
 });

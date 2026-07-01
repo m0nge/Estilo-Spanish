@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, Pencil, Trash2, GripVertical, Loader2, CheckCircle2, Clock,
@@ -175,11 +174,11 @@ function EtapaFormModal({ etapa, open, onClose, onSave }: {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-6 pb-2">
+      <DialogContent className="max-w-2xl flex flex-col p-0" style={{ maxHeight: "90vh" }}>
+        <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
           <DialogTitle>{etapa ? "Editar Etapa" : "Nueva Etapa"}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 overflow-y-auto px-6 min-h-0">
           <div className="space-y-4 pb-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5 col-span-2">
@@ -217,8 +216,8 @@ function EtapaFormModal({ etapa, open, onClose, onSave }: {
               <ChecklistEditor items={checklist} onChange={setChecklist} />
             </div>
           </div>
-        </ScrollArea>
-        <DialogFooter className="gap-2 px-6 py-4 border-t">
+        </div>
+        <DialogFooter className="gap-2 px-6 py-4 border-t flex-shrink-0">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button className="bg-red-600 hover:bg-red-700 text-white" disabled={!nombre.trim()} onClick={handleSave}>
             {etapa ? "Guardar cambios" : "Crear etapa"}
