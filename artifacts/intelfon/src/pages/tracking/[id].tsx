@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCallback } from "react";
 import {
-  ArrowLeft, CheckCircle2, Circle, AlertTriangle, ChevronRight,
+  ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight,
   MessageSquare, ArrowUpCircle
 } from "lucide-react";
 import ChatBox from "../../components/ChatBox";
@@ -27,18 +27,51 @@ const FASE_AREAS = [
   "Bodega/Activaciones", "Activaciones/Logística"
 ];
 
-function EtapaIcon({ estado, numero, actual, slaVencido }: { estado: string; numero: number; actual: boolean; slaVencido?: boolean }) {
-  if (estado === "completada") return <CheckCircle2 className="h-6 w-6 text-green-500" />;
-  if (actual) {
-    const bg = slaVencido ? "bg-red-600" : "bg-red-600";
+function AntennaIcon({ completada, actual, slaVencido }: { completada: boolean; actual: boolean; slaVencido?: boolean }) {
+  if (completada) {
     return (
-      <div className={`relative h-6 w-6 rounded-full ${bg} text-white flex items-center justify-center text-xs font-bold`}>
-        {slaVencido && <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />}
-        <span className="relative">{numero}</span>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+        <circle cx="12" cy="12" r="11" fill="#16a34a" />
+        <path d="M7 12l3 3 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  if (actual) {
+    const color = "#dc2626";
+    return (
+      <div className="relative flex-shrink-0" style={{ width: 24, height: 24 }}>
+        {slaVencido && (
+          <div className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-40" />
+        )}
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative">
+          <circle cx="12" cy="16" r="9" stroke={color} strokeWidth="1" strokeDasharray="3 3" opacity="0.45" />
+          <circle cx="12" cy="16" r="5" stroke={color} strokeWidth="1" strokeDasharray="2 3" opacity="0.3" />
+          <line x1="12" y1="16" x2="12" y2="8" stroke={color} strokeWidth="2" strokeLinecap="round" />
+          <line x1="12" y1="8" x2="8.5" y2="11.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+          <line x1="12" y1="8" x2="15.5" y2="11.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+          <circle cx="12" cy="7.5" r="1.5" fill={color} />
+          <circle cx="12" cy="16" r="2.5" fill={color} />
+          <line x1="9" y1="22" x2="15" y2="22" stroke={color} strokeWidth="2" strokeLinecap="round" />
+          <line x1="12" y1="16" x2="12" y2="22" stroke={color} strokeWidth="1.5" />
+        </svg>
       </div>
     );
   }
-  return <Circle className="h-6 w-6 text-gray-300" />;
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
+      <line x1="12" y1="16" x2="12" y2="8" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" />
+      <line x1="12" y1="8" x2="8.5" y2="11.5" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="12" y1="8" x2="15.5" y2="11.5" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="12" cy="7.5" r="1.5" fill="#d1d5db" />
+      <circle cx="12" cy="16" r="2.5" fill="#d1d5db" />
+      <line x1="9" y1="22" x2="15" y2="22" stroke="#d1d5db" strokeWidth="2" strokeLinecap="round" />
+      <line x1="12" y1="16" x2="12" y2="22" stroke="#d1d5db" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function EtapaIcon({ estado, numero, actual, slaVencido }: { estado: string; numero: number; actual: boolean; slaVencido?: boolean }) {
+  return <AntennaIcon completada={estado === "completada"} actual={actual} slaVencido={slaVencido} />;
 }
 
 function getEtapaBg(estado: string, esActual: boolean, slaVencido?: boolean) {

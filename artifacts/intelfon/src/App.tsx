@@ -11,7 +11,6 @@ import TrackingVista from "./pages/tracking/[id]";
 import EtapaVista from "./pages/etapa/[idProceso]/[numeroEtapa]";
 import AdminEtapas from "./pages/admin/etapas";
 import AdminUsuarios from "./pages/admin/usuarios";
-import AdminSla from "./pages/admin/sla";
 import AdminReportes from "./pages/admin/reportes";
 import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
@@ -75,9 +74,6 @@ function Router() {
       </Route>
       <Route path="/admin/usuarios">
         {() => <ProtectedRoute component={AdminUsuarios} adminOnly={true} />}
-      </Route>
-      <Route path="/admin/sla">
-        {() => <ProtectedRoute component={AdminSla} adminOnly={true} />}
       </Route>
       <Route path="/admin/reportes">
         {() => <ProtectedRoute component={AdminReportes} adminOnly={true} />}

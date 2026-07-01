@@ -115,12 +115,14 @@ router.delete("/admin/etapas/:id", requireAuth, requireAdmin, async (req, res): 
   res.sendStatus(204);
 });
 
-// Reordenar etapas: recibe array de {id, ordenVisualizacion}
+// Reordenar etapas: recibe array de {id, ordenVisualizacion, numeroEtapa?}
 router.put("/admin/etapas-orden", requireAuth, requireAdmin, async (req, res): Promise<void> => {
-  const orden: { id: number; ordenVisualizacion: number }[] = req.body;
+  const orden: { id: number; ordenVisualizacion: number; numeroEtapa?: number }[] = req.body;
   if (!Array.isArray(orden)) { res.status(400).json({ error: "Se esperaba un array" }); return; }
   for (const item of orden) {
-    await db.update(configuracionEtapasTable).set({ ordenVisualizacion: item.ordenVisualizacion }).where(eq(configuracionEtapasTable.id, item.id));
+    const updateData: Record<string, number> = { ordenVisualizacion: item.ordenVisualizacion };
+    if (item.numeroEtapa != null) updateData.numeroEtapa = item.numeroEtapa;
+    await db.update(configuracionEtapasTable).set(updateData as any).where(eq(configuracionEtapasTable.id, item.id));
   }
   res.json({ ok: true });
 });

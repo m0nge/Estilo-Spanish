@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, procesosTable, etapasProcesoTable, checklistItemsTable, configuracionEtapasTable, notificacionesTable } from "@workspace/db";
+import { db, procesosTable, etapasProcesoTable, checklistItemsTable, configuracionEtapasTable, notificacionesTable, usuariosTable } from "@workspace/db";
 import { eq, and, or, ilike, desc } from "drizzle-orm";
 import { requireAuth, AuthenticatedRequest } from "../middlewares/auth";
 import { ListProcesosQueryParams, UpdateProcesoBody, PriorizarProcesoBody } from "@workspace/api-zod";
@@ -27,6 +27,7 @@ export function calcularMinutosRestantes(fechaInicio: Date, slaHoras: number): n
 
 async function crearEtapasParaProceso(idProceso: number): Promise<void> {
   const configs = await db.select().from(configuracionEtapasTable).where(eq(configuracionEtapasTable.activa, true)).orderBy(configuracionEtapasTable.ordenVisualizacion);
+  const todosUsuarios = await db.select().from(usuariosTable).where(eq(usuariosTable.activo, true));
 
   for (const config of configs) {
     const [etapa] = await db.insert(etapasProcesoTable).values({
@@ -37,14 +38,21 @@ async function crearEtapasParaProceso(idProceso: number): Promise<void> {
       fechaInicio: config.numeroEtapa === configs[0]?.numeroEtapa ? new Date() : null,
     }).returning();
 
-    const template = config.checklistTemplate as { descripcion: string; area?: string; notificarUsuarioIds?: number[] }[];
+    const template = config.checklistTemplate as { descripcion: string; area?: string; notificarAreas?: string[]; notificarUsuarioIds?: number[] }[];
     for (const item of template) {
+      let notificarIds: number[] = item.notificarUsuarioIds ?? [];
+      // Resolver notificarAreas a IDs de usuarios activos en esas áreas
+      if (item.notificarAreas && item.notificarAreas.length > 0) {
+        notificarIds = todosUsuarios
+          .filter(u => item.notificarAreas!.some(a => (u.area ?? "").toLowerCase().includes(a.toLowerCase()) || a.toLowerCase().includes((u.area ?? "").toLowerCase())))
+          .map(u => u.id);
+      }
       await db.insert(checklistItemsTable).values({
         idEtapaProceso: etapa.id,
         descripcion: item.descripcion,
         areaResponsable: item.area ?? null,
         completado: false,
-        notificarUsuarioIds: item.notificarUsuarioIds ?? [],
+        notificarUsuarioIds: notificarIds,
       });
     }
   }
@@ -112,7 +120,7 @@ router.post("/procesos", requireAuth, async (req: AuthenticatedRequest, res): Pr
     estadoActual: primeraEtapa ? `en_fase_${primeraEtapa.numeroEtapa}` as any : "en_fase_1",
     clienteNombre: numeroPreoferta.trim(),
     prioridad: (prioridad as any) ?? "baja",
-    slaGlobalHoras: primeraEtapa?.slaHoras ?? 24,
+    slaGlobalHoras: configs.reduce((sum, c) => sum + c.slaHoras, 0) || 24,
     usuarioCreadorId: req.usuario!.id,
   }).returning();
 

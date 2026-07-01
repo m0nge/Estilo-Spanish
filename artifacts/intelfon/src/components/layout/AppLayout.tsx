@@ -6,7 +6,6 @@ import {
   PlusCircle, 
   Settings, 
   Users, 
-  Clock, 
   BarChart, 
   LogOut, 
   Menu,
@@ -84,7 +83,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
           { label: "Reportes SLA", href: "/admin/reportes", icon: BarChart },
           { label: "Config. Etapas", href: "/admin/etapas", icon: Settings },
           { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-          { label: "SLA Global", href: "/admin/sla", icon: Clock },
         ] 
       : [])
   ];
