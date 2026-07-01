@@ -76,11 +76,7 @@ interface TrackingWidgetProps {
 function PendientesPanel() {
   const { data: pendientes = [], isLoading } = useQuery<any[]>({
     queryKey: ["pendientes-area"],
-    queryFn: async () => {
-      const res = await customFetch("/api/pendientes-area");
-      if (!res.ok) return [];
-      return res.json();
-    },
+    queryFn: () => customFetch<any[]>("/api/pendientes-area").catch(() => []),
     refetchInterval: 60000,
   });
 

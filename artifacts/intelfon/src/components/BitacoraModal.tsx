@@ -50,17 +50,14 @@ export default function BitacoraModal({ open, onClose, procesoId, etapaProcesoId
       const url = etapaProcesoId
         ? `/api/bitacora/etapa/${etapaProcesoId}`
         : `/api/bitacora/proceso/${procesoId}`;
-      const res = await customFetch(url);
-      if (!res.ok) throw new Error("Error cargando bitácora");
-      return res.json();
+      return customFetch<BitacoraEntrada[]>(url);
     },
   });
 
   const addMutation = useMutation({
     mutationFn: async () => {
-      const res = await customFetch("/api/bitacora", {
+      return customFetch("/api/bitacora", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           procesoId,
           etapaProcesoId: etapaProcesoId ?? null,
@@ -70,8 +67,6 @@ export default function BitacoraModal({ open, onClose, procesoId, etapaProcesoId
           comentario: comentario.trim(),
         }),
       });
-      if (!res.ok) throw new Error("Error al guardar");
-      return res.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey });

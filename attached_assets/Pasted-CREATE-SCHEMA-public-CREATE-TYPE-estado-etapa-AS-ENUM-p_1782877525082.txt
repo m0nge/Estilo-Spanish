@@ -1,0 +1,121 @@
+CREATE SCHEMA "public";
+CREATE TYPE "estado_etapa" AS ENUM('pendiente', 'activa', 'completada');
+CREATE TYPE "estado_proceso" AS ENUM('en_espera', 'en_fase_1', 'en_fase_2', 'en_fase_3', 'en_fase_4', 'en_fase_5', 'completado');
+CREATE TYPE "prioridad_proceso" AS ENUM('baja', 'media', 'alta', 'urgente');
+CREATE TYPE "rol_usuario" AS ENUM('Ventas', 'Activaciones', 'Bodega', 'MSO', 'Logistica', 'Admin');
+CREATE TYPE "tipo_notificacion" AS ENUM('etapa_lista', 'sla_proximo', 'sla_vencido', 'chat_nuevo', 'comentario_nuevo', 'documento_faltante');
+CREATE TABLE "chat_mensajes" (
+	"id" serial PRIMARY KEY,
+	"id_proceso" integer NOT NULL,
+	"etapa_origen" integer NOT NULL,
+	"etapa_destino" integer NOT NULL,
+	"usuario_remitente_id" integer NOT NULL,
+	"contenido" text DEFAULT '' NOT NULL,
+	"fecha_mensaje" timestamp with time zone DEFAULT now() NOT NULL,
+	"leido" boolean DEFAULT false NOT NULL,
+	"imagen_base64" text
+);
+CREATE TABLE "checklist_items" (
+	"id" serial PRIMARY KEY,
+	"id_etapa_proceso" integer NOT NULL,
+	"descripcion" text NOT NULL,
+	"completado" boolean DEFAULT false NOT NULL,
+	"area_responsable" text,
+	"usuario_quien_completo_id" integer,
+	"fecha_completado" timestamp with time zone,
+	"notas" text
+);
+CREATE TABLE "configuracion_etapas" (
+	"id" serial PRIMARY KEY,
+	"numero_etapa" integer NOT NULL CONSTRAINT "configuracion_etapas_numero_etapa_unique" UNIQUE,
+	"nombre_etapa" text NOT NULL,
+	"descripcion" text,
+	"sla_horas" integer DEFAULT 24 NOT NULL,
+	"areas_involucradas" json DEFAULT '[]' NOT NULL,
+	"checklist_template" json DEFAULT '[]' NOT NULL,
+	"activa" boolean DEFAULT true NOT NULL,
+	"orden_visualizacion" integer DEFAULT 1 NOT NULL
+);
+CREATE TABLE "configuracion_sla" (
+	"id" serial PRIMARY KEY,
+	"nombre" text DEFAULT 'Configuración Global' NOT NULL,
+	"sla_global_horas" integer DEFAULT 120 NOT NULL,
+	"alerta_porcentaje" integer DEFAULT 80 NOT NULL,
+	"activo" boolean DEFAULT true NOT NULL
+);
+CREATE TABLE "etapas_proceso" (
+	"id" serial PRIMARY KEY,
+	"id_proceso" integer NOT NULL,
+	"numero_etapa" integer NOT NULL,
+	"estado" estado_etapa DEFAULT 'pendiente' NOT NULL,
+	"fecha_inicio" timestamp with time zone,
+	"fecha_fin" timestamp with time zone,
+	"sla_etapa_horas" integer DEFAULT 24 NOT NULL,
+	"usuario_responsable_id" integer,
+	"completado_por_id" integer,
+	"checklist_completado" boolean DEFAULT false NOT NULL,
+	"justificacion_retraso" text
+);
+CREATE TABLE "notificaciones" (
+	"id" serial PRIMARY KEY,
+	"usuario_destino_id" integer NOT NULL,
+	"id_proceso" integer,
+	"tipo" tipo_notificacion NOT NULL,
+	"titulo" text NOT NULL,
+	"mensaje" text NOT NULL,
+	"leido" boolean DEFAULT false NOT NULL,
+	"fecha_creacion" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "procesos" (
+	"id" serial PRIMARY KEY,
+	"numero_preoferta" text NOT NULL CONSTRAINT "procesos_numero_preoferta_unique" UNIQUE,
+	"estado_actual" estado_proceso DEFAULT 'en_espera' NOT NULL,
+	"cliente_nombre" text NOT NULL,
+	"cliente_email" text,
+	"cliente_telefono" text,
+	"tipo_cliente" text,
+	"plan_solicitado" text,
+	"cantidad_equipos" integer DEFAULT 1,
+	"fecha_inicio" timestamp with time zone DEFAULT now() NOT NULL,
+	"fecha_fin_estimada" timestamp with time zone,
+	"fecha_fin_real" timestamp with time zone,
+	"sla_global_horas" integer DEFAULT 120 NOT NULL,
+	"prioridad" prioridad_proceso DEFAULT 'baja' NOT NULL,
+	"fijado" boolean DEFAULT false NOT NULL,
+	"justificacion_retraso" text,
+	"usuario_creador_id" integer,
+	"codigo_str" text,
+	"codigo_b800" text,
+	"codigo_r800" text
+);
+CREATE TABLE "usuarios" (
+	"id" serial PRIMARY KEY,
+	"nombre" text NOT NULL,
+	"email" text NOT NULL CONSTRAINT "usuarios_email_unique" UNIQUE,
+	"password_hash" text NOT NULL,
+	"rol" rol_usuario DEFAULT 'Ventas' NOT NULL,
+	"area" text,
+	"activo" boolean DEFAULT true NOT NULL,
+	"fecha_creacion" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "chat_mensajes" ADD CONSTRAINT "chat_mensajes_id_proceso_procesos_id_fk" FOREIGN KEY ("id_proceso") REFERENCES "procesos"("id");
+ALTER TABLE "chat_mensajes" ADD CONSTRAINT "chat_mensajes_usuario_remitente_id_usuarios_id_fk" FOREIGN KEY ("usuario_remitente_id") REFERENCES "usuarios"("id");
+ALTER TABLE "checklist_items" ADD CONSTRAINT "checklist_items_id_etapa_proceso_etapas_proceso_id_fk" FOREIGN KEY ("id_etapa_proceso") REFERENCES "etapas_proceso"("id");
+ALTER TABLE "checklist_items" ADD CONSTRAINT "checklist_items_usuario_quien_completo_id_usuarios_id_fk" FOREIGN KEY ("usuario_quien_completo_id") REFERENCES "usuarios"("id");
+ALTER TABLE "etapas_proceso" ADD CONSTRAINT "etapas_proceso_completado_por_id_usuarios_id_fk" FOREIGN KEY ("completado_por_id") REFERENCES "usuarios"("id");
+ALTER TABLE "etapas_proceso" ADD CONSTRAINT "etapas_proceso_id_proceso_procesos_id_fk" FOREIGN KEY ("id_proceso") REFERENCES "procesos"("id");
+ALTER TABLE "etapas_proceso" ADD CONSTRAINT "etapas_proceso_usuario_responsable_id_usuarios_id_fk" FOREIGN KEY ("usuario_responsable_id") REFERENCES "usuarios"("id");
+ALTER TABLE "notificaciones" ADD CONSTRAINT "notificaciones_id_proceso_procesos_id_fk" FOREIGN KEY ("id_proceso") REFERENCES "procesos"("id");
+ALTER TABLE "notificaciones" ADD CONSTRAINT "notificaciones_usuario_destino_id_usuarios_id_fk" FOREIGN KEY ("usuario_destino_id") REFERENCES "usuarios"("id");
+ALTER TABLE "procesos" ADD CONSTRAINT "procesos_usuario_creador_id_usuarios_id_fk" FOREIGN KEY ("usuario_creador_id") REFERENCES "usuarios"("id");
+CREATE UNIQUE INDEX "chat_mensajes_pkey" ON "chat_mensajes" ("id");
+CREATE UNIQUE INDEX "checklist_items_pkey" ON "checklist_items" ("id");
+CREATE UNIQUE INDEX "configuracion_etapas_numero_etapa_unique" ON "configuracion_etapas" ("numero_etapa");
+CREATE UNIQUE INDEX "configuracion_etapas_pkey" ON "configuracion_etapas" ("id");
+CREATE UNIQUE INDEX "configuracion_sla_pkey" ON "configuracion_sla" ("id");
+CREATE UNIQUE INDEX "etapas_proceso_pkey" ON "etapas_proceso" ("id");
+CREATE UNIQUE INDEX "notificaciones_pkey" ON "notificaciones" ("id");
+CREATE UNIQUE INDEX "procesos_numero_preoferta_unique" ON "procesos" ("numero_preoferta");
+CREATE UNIQUE INDEX "procesos_pkey" ON "procesos" ("id");
+CREATE UNIQUE INDEX "usuarios_email_unique" ON "usuarios" ("email");
+CREATE UNIQUE INDEX "usuarios_pkey" ON "usuarios" ("id");

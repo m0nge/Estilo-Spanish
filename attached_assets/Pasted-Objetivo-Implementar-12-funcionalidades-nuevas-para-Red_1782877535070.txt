@@ -1,0 +1,59 @@
+Objetivo
+Implementar 12 funcionalidades nuevas para Red Intelfon.
+
+Tasks
+T001: DB Schema changes [BLOQUEADOR]
+Blocked By: []
+Detalles:
+configuracion_etapas: agregar color text
+checklist_items: agregar notificar_usuario_ids json, timestamp ya existe
+Nueva tabla bitacora_entradas (id, checklist_item_id nullable, etapa_proceso_id, proceso_id, autor_id, contacto_nombre, contacto_telefono, comentario, created_at)
+procesos.cliente_nombre: hacer nullable (solo pre-oferta es requerido)
+Push-force al DB
+T002: Business hours SLA [BLOQUEADOR]
+Blocked By: []
+SLA pausado fuera de 8am-5pm (lun-vie)
+Reescribir calcularMinutosRestantes y calcularSlaVencido
+T003: Proceso solo pide pre-oferta
+Blocked By: [T001]
+Frontend: formulario solo muestra numero_preoferta
+Backend: hacer clienteNombre optional (usar preoferta como fallback)
+T004: Admin CRUD etapas + colores
+Blocked By: [T001]
+Routes: GET/POST/PUT/DELETE /admin/etapas
+Frontend: admin/etapas.tsx con drag reorder, color picker, nombre editable
+Color guardado en configuracion_etapas.color
+T005: Checklist timestamps visibles
+Blocked By: []
+Mostrar fecha_completado en cada item al hacer check
+Ya está guardado en DB, solo mostrar
+T006: Notificaciones por checklist item
+Blocked By: [T001]
+Admin configura usuarios a notificar por item template
+Al marcar un item → enviar notif plataforma + email a esos usuarios
+T007: Bitácora por tarea
+Blocked By: [T001]
+UI en etapa: botón "+ Bitácora" en cada checklist item
+Modal: nombre, teléfono, comentario
+List inline bajo el item
+T008: Dashboard por rol
+Blocked By: []
+Admin: ve TrackingWidget
+Otros roles: ven lista de "Pendientes de aprobación" (checklist items sin completar en su área)
+T009: SLA por fase + email admin al vencer
+Blocked By: [T002]
+SLA checker ya existe; actualizar para usar business hours
+Al vencer SLA de etapa → email al admin
+T010: Fix foto en chat
+Blocked By: []
+Investigar por qué no funciona
+Verificar que el campo imagen_base64 llega al servidor y se guarda
+T011: @menciones en chat
+Blocked By: []
+Al escribir @ listar usuarios, insertar @nombre
+POST chat → detectar @nombre, crear notificacion a ese usuario
+Notificación indica proceso donde fue mencionado
+T012: Antena animada en tracking
+Blocked By: []
+Reemplazar dots por íconos de antena SVG
+Radio wave animado desde la antena activa
